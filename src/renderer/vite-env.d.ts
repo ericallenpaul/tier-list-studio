@@ -1,11 +1,9 @@
 /// <reference types="vite/client" />
 
-interface TierStudioApi {
-  app: {
-    getVersion: () => Promise<string>;
-  };
-}
+import type { TierStudioApi } from "../shared/contracts/tierStudioApi";
 
-interface Window {
-  tierStudio: TierStudioApi;
+declare global {
+  interface Window {
+    tierStudio: TierStudioApi;
+  }
 }

@@ -1,8 +1,9 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 
+import { registerHandlers } from "./ipc/registerHandlers.js";
 import { createMainWindow } from "./windows/createMainWindow.js";
 
-ipcMain.handle("app:getVersion", () => app.getVersion());
+registerHandlers(ipcMain, app);
 
 app.whenReady().then(() => {
   createMainWindow();
