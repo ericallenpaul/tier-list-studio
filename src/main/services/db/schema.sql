@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS app_settings (
   key TEXT PRIMARY KEY,
-  value_json TEXT NOT NULL,
+  value_json TEXT NOT NULL CHECK (json_valid(value_json)),
   updated_at TEXT NOT NULL
 ) STRICT;
 
@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
-  theme_json TEXT NOT NULL DEFAULT '{}',
+  theme_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(theme_json)),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 ) STRICT;
@@ -20,12 +20,12 @@ CREATE TABLE IF NOT EXISTS tier_lists (
   subtitle TEXT NOT NULL DEFAULT '',
   description TEXT NOT NULL DEFAULT '',
   slug TEXT NOT NULL,
-  categories_json TEXT NOT NULL DEFAULT '[]',
-  board_style_json TEXT NOT NULL DEFAULT '{}',
-  tier_style_json TEXT NOT NULL DEFAULT '{}',
-  item_style_json TEXT NOT NULL DEFAULT '{}',
-  interaction_json TEXT NOT NULL DEFAULT '{}',
-  presentation_json TEXT NOT NULL DEFAULT '{}',
+  categories_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(categories_json)),
+  board_style_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(board_style_json)),
+  tier_style_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(tier_style_json)),
+  item_style_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(item_style_json)),
+  interaction_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(interaction_json)),
+  presentation_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(presentation_json)),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   UNIQUE(workspace_id, slug)
@@ -44,10 +44,11 @@ CREATE TABLE IF NOT EXISTS tier_rows (
   icon_text TEXT NOT NULL DEFAULT '',
   row_height INTEGER NOT NULL DEFAULT 96,
   max_items INTEGER,
-  style_json TEXT NOT NULL DEFAULT '{}',
+  style_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(style_json)),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  UNIQUE(tier_list_id, sort_order)
+  UNIQUE(tier_list_id, sort_order),
+  UNIQUE(id, tier_list_id)
 ) STRICT;
 
 CREATE TABLE IF NOT EXISTS media_assets (
@@ -64,7 +65,7 @@ CREATE TABLE IF NOT EXISTS media_assets (
   managed_rel_path TEXT NOT NULL,
   thumb_rel_path TEXT NOT NULL DEFAULT '',
   poster_rel_path TEXT NOT NULL DEFAULT '',
-  metadata_json TEXT NOT NULL DEFAULT '{}',
+  metadata_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(metadata_json)),
   created_at TEXT NOT NULL
 ) STRICT;
 
@@ -75,12 +76,13 @@ CREATE TABLE IF NOT EXISTS items (
   label TEXT NOT NULL,
   subtitle TEXT NOT NULL DEFAULT '',
   note TEXT NOT NULL DEFAULT '',
-  tags_json TEXT NOT NULL DEFAULT '[]',
+  tags_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(tags_json)),
   asset_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL,
-  style_json TEXT NOT NULL DEFAULT '{}',
-  metadata_json TEXT NOT NULL DEFAULT '{}',
+  style_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(style_json)),
+  metadata_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(metadata_json)),
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  UNIQUE(id, tier_list_id)
 ) STRICT;
 
 CREATE TABLE IF NOT EXISTS item_positions (
@@ -90,7 +92,9 @@ CREATE TABLE IF NOT EXISTS item_positions (
   tier_row_id TEXT REFERENCES tier_rows(id) ON DELETE CASCADE,
   sort_order REAL NOT NULL,
   updated_at TEXT NOT NULL,
-  CHECK ((container_type = 'pool' AND tier_row_id IS NULL) OR (container_type = 'tier' AND tier_row_id IS NOT NULL))
+  CHECK ((container_type = 'pool' AND tier_row_id IS NULL) OR (container_type = 'tier' AND tier_row_id IS NOT NULL)),
+  FOREIGN KEY (item_id, tier_list_id) REFERENCES items(id, tier_list_id) ON DELETE CASCADE,
+  FOREIGN KEY (tier_row_id, tier_list_id) REFERENCES tier_rows(id, tier_list_id) ON DELETE CASCADE
 ) STRICT;
 
 CREATE TABLE IF NOT EXISTS templates (
@@ -99,7 +103,7 @@ CREATE TABLE IF NOT EXISTS templates (
   name TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
   category TEXT NOT NULL DEFAULT '',
-  definition_json TEXT NOT NULL,
+  definition_json TEXT NOT NULL CHECK (json_valid(definition_json)),
   built_in INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -110,7 +114,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
   tier_list_id TEXT NOT NULL REFERENCES tier_lists(id) ON DELETE CASCADE,
   label TEXT NOT NULL,
   summary TEXT NOT NULL DEFAULT '',
-  state_json TEXT NOT NULL,
+  state_json TEXT NOT NULL CHECK (json_valid(state_json)),
   created_at TEXT NOT NULL
 ) STRICT;
 
@@ -119,7 +123,7 @@ CREATE TABLE IF NOT EXISTS export_history (
   tier_list_id TEXT NOT NULL REFERENCES tier_lists(id) ON DELETE CASCADE,
   export_kind TEXT NOT NULL CHECK (export_kind IN ('png','jpeg','json','csv','print')),
   output_path TEXT NOT NULL,
-  options_json TEXT NOT NULL DEFAULT '{}',
+  options_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(options_json)),
   created_at TEXT NOT NULL
 ) STRICT;
 

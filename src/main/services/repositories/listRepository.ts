@@ -126,12 +126,12 @@ export class ListRepository extends BaseRepository {
       subtitle: row.subtitle,
       description: row.description,
       slug: row.slug,
-      categories: this.parseArray(row.categories_json),
-      boardStyle: this.parseObject(row.board_style_json),
-      tierStyle: this.parseObject(row.tier_style_json),
-      itemStyle: this.parseObject(row.item_style_json),
-      interaction: this.parseObject(row.interaction_json),
-      presentation: this.parseObject(row.presentation_json),
+      categories: this.parseArray(row.categories_json, "tier_lists.categories_json"),
+      boardStyle: this.parseObject(row.board_style_json, "tier_lists.board_style_json"),
+      tierStyle: this.parseObject(row.tier_style_json, "tier_lists.tier_style_json"),
+      itemStyle: this.parseObject(row.item_style_json, "tier_lists.item_style_json"),
+      interaction: this.parseObject(row.interaction_json, "tier_lists.interaction_json"),
+      presentation: this.parseObject(row.presentation_json, "tier_lists.presentation_json"),
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };

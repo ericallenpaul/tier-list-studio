@@ -16,9 +16,12 @@ export const openDatabase = ({ filePath, readonly = false }: OpenDatabaseOptions
 
   const db = new Database(filePath, { readonly });
   db.pragma("foreign_keys = ON");
-  db.pragma("journal_mode = WAL");
-  db.pragma("synchronous = NORMAL");
   db.pragma("busy_timeout = 5000");
+
+  if (!readonly) {
+    db.pragma("journal_mode = WAL");
+    db.pragma("synchronous = NORMAL");
+  }
 
   return db;
 };

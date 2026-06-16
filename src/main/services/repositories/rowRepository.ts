@@ -137,7 +137,7 @@ export class RowRepository extends BaseRepository {
       iconText: row.icon_text,
       rowHeight: row.row_height,
       maxItems: row.max_items,
-      style: this.parseObject(row.style_json),
+      style: this.parseObject(row.style_json, "tier_rows.style_json"),
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };

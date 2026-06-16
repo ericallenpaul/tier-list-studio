@@ -76,7 +76,7 @@ export class WorkspaceRepository extends BaseRepository {
       id: row.id,
       name: row.name,
       description: row.description,
-      theme: this.parseObject(row.theme_json),
+      theme: this.parseObject(row.theme_json, "workspaces.theme_json"),
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };

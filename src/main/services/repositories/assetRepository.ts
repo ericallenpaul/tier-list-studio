@@ -103,7 +103,7 @@ export class AssetRepository extends BaseRepository {
       managedRelPath: row.managed_rel_path,
       thumbRelPath: row.thumb_rel_path,
       posterRelPath: row.poster_rel_path,
-      metadata: this.parseObject(row.metadata_json),
+      metadata: this.parseObject(row.metadata_json, "media_assets.metadata_json"),
       createdAt: row.created_at
     };
   }

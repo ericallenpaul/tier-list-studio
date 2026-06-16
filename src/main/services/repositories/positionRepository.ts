@@ -20,6 +20,8 @@ export interface UpsertItemPositionInput {
 
 export class PositionRepository extends BaseRepository {
   upsert(input: UpsertItemPositionInput): ItemPositionRecord {
+    this.validateSameListPosition(input);
+
     this.db.prepare(`
       INSERT INTO item_positions (item_id, tier_list_id, container_type, tier_row_id, sort_order, updated_at)
       VALUES (@itemId, @tierListId, @containerType, @tierRowId, @sortOrder, @updatedAt)
@@ -57,6 +59,30 @@ export class PositionRepository extends BaseRepository {
 
   delete(itemId: string) {
     this.db.prepare("DELETE FROM item_positions WHERE item_id = ?").run(itemId);
+  }
+
+  private validateSameListPosition(input: UpsertItemPositionInput) {
+    const item = this.db
+      .prepare("SELECT tier_list_id FROM items WHERE id = ?")
+      .get(input.itemId) as { tier_list_id: string } | undefined;
+    if (!item) {
+      throw new Error(`Cannot position missing item: ${input.itemId}`);
+    }
+    if (item.tier_list_id !== input.tierListId) {
+      throw new Error(`Cannot position item ${input.itemId} in tier list ${input.tierListId}; item belongs to ${item.tier_list_id}`);
+    }
+
+    if (input.tierRowId) {
+      const row = this.db
+        .prepare("SELECT tier_list_id FROM tier_rows WHERE id = ?")
+        .get(input.tierRowId) as { tier_list_id: string } | undefined;
+      if (!row) {
+        throw new Error(`Cannot position item in missing tier row: ${input.tierRowId}`);
+      }
+      if (row.tier_list_id !== input.tierListId) {
+        throw new Error(`Cannot position item ${input.itemId} in row ${input.tierRowId}; row belongs to ${row.tier_list_id}`);
+      }
+    }
   }
 
   private map(row: ItemPositionRow): ItemPositionRecord {

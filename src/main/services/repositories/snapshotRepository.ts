@@ -55,7 +55,7 @@ export class SnapshotRepository extends BaseRepository {
       tierListId: row.tier_list_id,
       label: row.label,
       summary: row.summary,
-      state: this.parseJson(row.state_json, {}),
+      state: this.parseJson(row.state_json, {}, "snapshots.state_json"),
       createdAt: row.created_at
     };
   }

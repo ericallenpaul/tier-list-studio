@@ -80,6 +80,36 @@ describe("SQLite connection and migrations", () => {
     expect(db.prepare("SELECT COUNT(*) AS count FROM templates WHERE built_in = 1").get()).toEqual({ count: 2 });
     expect(db.prepare("SELECT COUNT(*) AS count FROM app_settings WHERE key = 'defaultWorkspaceId'").get()).toEqual({ count: 1 });
   });
+
+  it("rejects invalid JSON in constrained columns", () => {
+    expect(() => {
+      db.prepare(`
+        INSERT INTO app_settings (key, value_json, updated_at)
+        VALUES ('broken', '{not-json', '2026-01-01T00:00:00.000Z')
+      `).run();
+    }).toThrow();
+  });
+
+  it("surfaces invalid persisted JSON when reading existing corrupted data", () => {
+    db.pragma("ignore_check_constraints = ON");
+    db.prepare(`
+      INSERT INTO app_settings (key, value_json, updated_at)
+      VALUES ('legacy-broken', '{not-json', '2026-01-01T00:00:00.000Z')
+    `).run();
+    db.pragma("ignore_check_constraints = OFF");
+
+    const settings = new SettingsRepository(db);
+    expect(() => settings.get("legacy-broken")).toThrow(/Invalid persisted JSON in app_settings.value_json/);
+  });
+
+  it("opens an existing database readonly without mutating WAL mode", () => {
+    closeDatabase(db);
+    db = openDatabase({ filePath: join(tempDir, "test.sqlite"), readonly: true });
+
+    expect((db.pragma("foreign_keys") as Array<{ foreign_keys: number }>)[0].foreign_keys).toBe(1);
+    expect((db.pragma("busy_timeout") as Array<{ timeout: number }>)[0].timeout).toBe(5000);
+    expect(db.prepare("SELECT COUNT(*) AS count FROM workspaces").get()).toEqual({ count: 1 });
+  });
 });
 
 describe("repositories", () => {
@@ -121,6 +151,42 @@ describe("repositories", () => {
     expect(rows.get(row.id)).toBeUndefined();
     expect(items.get(item.id)).toBeUndefined();
     expect(positions.get(item.id)).toBeUndefined();
+  });
+
+  it("rejects item positions that cross tier lists", () => {
+    const lists = new ListRepository(db);
+    const rows = new RowRepository(db);
+    const items = new ItemRepository(db);
+    const positions = new PositionRepository(db);
+
+    const firstList = lists.create({ workspaceId: "workspace-default", title: "First", slug: "first" });
+    const secondList = lists.create({ workspaceId: "workspace-default", title: "Second", slug: "second" });
+    const firstItem = items.create({ tierListId: firstList.id, sourceType: "text", label: "First item" });
+    const firstRow = rows.create({ tierListId: firstList.id, sortOrder: 1, label: "A", fillColor: "#22c55e" });
+    const secondRow = rows.create({ tierListId: secondList.id, sortOrder: 1, label: "B", fillColor: "#3b82f6" });
+
+    expect(() => positions.upsert({
+      itemId: firstItem.id,
+      tierListId: secondList.id,
+      containerType: "pool",
+      sortOrder: 1
+    })).toThrow(/item belongs to/);
+
+    expect(() => positions.upsert({
+      itemId: firstItem.id,
+      tierListId: firstList.id,
+      containerType: "tier",
+      tierRowId: secondRow.id,
+      sortOrder: 1
+    })).toThrow(/row belongs to/);
+
+    expect(positions.upsert({
+      itemId: firstItem.id,
+      tierListId: firstList.id,
+      containerType: "tier",
+      tierRowId: firstRow.id,
+      sortOrder: 1
+    }).tierRowId).toBe(firstRow.id);
   });
 
   it("enforces media asset sha uniqueness and can find by sha", () => {

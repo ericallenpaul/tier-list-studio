@@ -99,7 +99,7 @@ export class TemplateRepository extends BaseRepository {
       name: row.name,
       description: row.description,
       category: row.category,
-      definition: this.parseJson(row.definition_json, {}),
+      definition: this.parseJson(row.definition_json, {}, "templates.definition_json"),
       builtIn: row.built_in === 1,
       createdAt: row.created_at,
       updatedAt: row.updated_at

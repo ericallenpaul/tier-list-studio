@@ -114,10 +114,10 @@ export class ItemRepository extends BaseRepository {
       label: row.label,
       subtitle: row.subtitle,
       note: row.note,
-      tags: this.parseArray(row.tags_json),
+      tags: this.parseArray(row.tags_json, "items.tags_json"),
       assetId: row.asset_id,
-      style: this.parseObject(row.style_json),
-      metadata: this.parseObject(row.metadata_json),
+      style: this.parseObject(row.style_json, "items.style_json"),
+      metadata: this.parseObject(row.metadata_json, "items.metadata_json"),
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };

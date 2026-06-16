@@ -34,7 +34,7 @@ export class SettingsRepository extends BaseRepository {
   private map(row: SettingRow): AppSettingRecord {
     return {
       key: row.key,
-      value: this.parseJson(row.value_json, null),
+      value: this.parseJson(row.value_json, null, "app_settings.value_json"),
       updatedAt: row.updated_at
     };
   }

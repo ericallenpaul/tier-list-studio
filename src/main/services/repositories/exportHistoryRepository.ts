@@ -55,7 +55,7 @@ export class ExportHistoryRepository extends BaseRepository {
       tierListId: row.tier_list_id,
       exportKind: row.export_kind,
       outputPath: row.output_path,
-      options: this.parseObject(row.options_json),
+      options: this.parseObject(row.options_json, "export_history.options_json"),
       createdAt: row.created_at
     };
   }
