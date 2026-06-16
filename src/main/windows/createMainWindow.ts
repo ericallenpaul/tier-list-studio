@@ -2,30 +2,20 @@ import { app, BrowserWindow } from "electron";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const __dirname = fileURLToPath(new URL(".", import.meta.url));
+import { isAllowedDevServerUrl } from "./devServerUrl.js";
 
-const isLoopbackHostname = (hostname: string) => {
-  return hostname === "localhost" || hostname === "::1" || hostname === "[::1]" || hostname.startsWith("127.");
-};
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
 const getLoopbackDevServerUrl = () => {
   if (app.isPackaged || !process.env.VITE_DEV_SERVER_URL) {
     return undefined;
   }
 
-  let devServerUrl: URL;
-
-  try {
-    devServerUrl = new URL(process.env.VITE_DEV_SERVER_URL);
-  } catch {
+  if (!isAllowedDevServerUrl(process.env.VITE_DEV_SERVER_URL)) {
     return undefined;
   }
 
-  if (!["http:", "https:"].includes(devServerUrl.protocol) || !isLoopbackHostname(devServerUrl.hostname)) {
-    return undefined;
-  }
-
-  return devServerUrl.toString();
+  return new URL(process.env.VITE_DEV_SERVER_URL).toString();
 };
 
 export const createMainWindow = () => {
@@ -41,6 +31,8 @@ export const createMainWindow = () => {
       preload: join(__dirname, "../../preload/index.cjs")
     }
   });
+
+  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
 
   const devServerUrl = getLoopbackDevServerUrl();
 
