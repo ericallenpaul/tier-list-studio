@@ -11,7 +11,7 @@ const createMainWindow = () => {
     minWidth: 960,
     minHeight: 640,
     webPreferences: {
-      preload: join(__dirname, "../preload/index.js")
+      preload: join(__dirname, "../preload/index.cjs")
     }
   });
 
