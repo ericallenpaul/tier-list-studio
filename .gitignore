@@ -1,0 +1,10 @@
+.worktrees/
+node_modules/
+dist/
+dist-electron/
+release/
+out/
+coverage/
+.env
+.env.*
+*.log
