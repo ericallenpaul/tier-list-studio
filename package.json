@@ -17,12 +17,14 @@
     "package:win": "corepack pnpm run build && electron-builder --win nsis"
   },
   "dependencies": {
+    "better-sqlite3": "^12.11.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.53.1",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.0.3",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
@@ -39,6 +41,7 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "better-sqlite3",
       "electron",
       "electron-winstaller",
       "esbuild"
