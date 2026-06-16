@@ -14,6 +14,7 @@ import type {
   RowUpdateInput,
   SaveFileOptions,
   SaveFileResult,
+  SettingsUpdateInput,
   TierStudioDomainResults,
   WorkspaceCreateInput,
   WorkspaceUpdateInput
@@ -80,7 +81,7 @@ export interface TierStudioApi {
   };
   settings: {
     get: () => Promise<UserSettings>;
-    update: (patch: Partial<UserSettings>) => Promise<UserSettings>;
+    update: (patch: SettingsUpdateInput) => Promise<UserSettings>;
   };
   ai: {
     getProviders: () => Promise<AiProvider[]>;

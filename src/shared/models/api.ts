@@ -23,6 +23,7 @@ import type {
   RowInsertInput,
   RowUpdateInput,
   SaveFileInput,
+  SettingsUpdateInput,
   WorkspaceCreateInput,
   WorkspaceUpdateInput
 } from "../schemas/inputs.js";
@@ -135,6 +136,7 @@ export type {
   RowInsertInput,
   RowUpdateInput,
   SaveFileInput,
+  SettingsUpdateInput,
   WorkspaceCreateInput,
   WorkspaceUpdateInput
 };

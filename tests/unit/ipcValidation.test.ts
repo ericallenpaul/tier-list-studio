@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { registerValidatedHandler, type IpcMainLike } from "../../src/main/ipc/registerHandlers";
+import type { TierStudioApi } from "../../src/shared/contracts/tierStudioApi";
+import type { SettingsUpdateInput } from "../../src/shared/models/api";
 import { tierStudioChannels, type TierStudioChannel } from "../../src/preload/channelTypes";
 import {
   aiGenerateItemsInputSchema,
@@ -159,5 +161,16 @@ describe("representative IPC input schemas", () => {
       filters: [{ name: "Images", extensions: ["png", "jpg"] }],
       multiple: false
     });
+  });
+});
+
+describe("shared API contract inputs", () => {
+  it("keeps settings.update aligned with the Zod-derived input type", () => {
+    type SettingsUpdateParameter = Parameters<TierStudioApi["settings"]["update"]>[0];
+
+    const schemaInput: SettingsUpdateInput = { theme: "dark", ai: { enabled: true } };
+    const contractInput: SettingsUpdateParameter = schemaInput;
+
+    expect(contractInput).toEqual(schemaInput);
   });
 });
