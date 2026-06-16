@@ -1,7 +1,9 @@
 import type { App } from "electron";
+import { join } from "node:path";
 import type { ZodType } from "zod";
 
 import { tierStudioChannels, type TierStudioChannel } from "../../preload/channelTypes.cjs";
+import type { TierStudioServices } from "../../shared/contracts/tierStudioApi.js";
 import {
   addTextBatchPayloadSchema,
   aiGenerateItemsInputSchema,
@@ -32,6 +34,9 @@ import {
   workspaceUpdatePayloadSchema
 } from "../../shared/schemas/inputs.js";
 import { voidPayloadSchema } from "../../shared/schemas/common.js";
+import { openDatabase, type SqliteDatabase } from "../services/db/connection.js";
+import { runMigrations } from "../services/db/migrations.js";
+import { createCoreListServices, type CoreListServices } from "../services/lists/listService.js";
 
 export interface IpcMainLike {
   handle: (channel: string, listener: (event: unknown, payload?: unknown) => unknown) => void;
@@ -55,7 +60,30 @@ const notImplemented = (channel: TierStudioChannel) => () => {
   throw new Error(`IPC channel is not implemented yet: ${channel}`);
 };
 
-export const registerHandlers = (ipcMain: IpcMainLike, app: Pick<App, "getVersion" | "getPath">) => {
+let productionDb: SqliteDatabase | undefined;
+let productionCoreServices: CoreListServices | undefined;
+
+const getProductionCoreServices = (app: Pick<App, "getPath">) => {
+  if (!productionCoreServices) {
+    productionDb = openDatabase({ filePath: join(app.getPath("userData"), "tier-list-studio.sqlite") });
+    runMigrations(productionDb);
+    productionCoreServices = createCoreListServices(productionDb);
+  }
+
+  return productionCoreServices;
+};
+
+type RegisterHandlerOptions = {
+  services?: Partial<TierStudioServices>;
+};
+
+export const registerHandlers = (
+  ipcMain: IpcMainLike,
+  app: Pick<App, "getVersion" | "getPath">,
+  options: RegisterHandlerOptions = {}
+) => {
+  const coreServices = () => (options.services as CoreListServices | undefined) ?? getProductionCoreServices(app);
+
   registerValidatedHandler(ipcMain, tierStudioChannels.app.getVersion, voidPayloadSchema, () => app.getVersion());
   registerValidatedHandler(ipcMain, tierStudioChannels.app.getPaths, voidPayloadSchema, () => ({
     userData: app.getPath("userData"),
@@ -66,30 +94,30 @@ export const registerHandlers = (ipcMain: IpcMainLike, app: Pick<App, "getVersio
   registerValidatedHandler(ipcMain, tierStudioChannels.dialogs.openFiles, openFilesInputSchema, notImplemented(tierStudioChannels.dialogs.openFiles));
   registerValidatedHandler(ipcMain, tierStudioChannels.dialogs.saveFile, saveFileInputSchema, notImplemented(tierStudioChannels.dialogs.saveFile));
 
-  registerValidatedHandler(ipcMain, tierStudioChannels.workspaces.list, voidPayloadSchema, notImplemented(tierStudioChannels.workspaces.list));
-  registerValidatedHandler(ipcMain, tierStudioChannels.workspaces.create, workspaceCreateInputSchema, notImplemented(tierStudioChannels.workspaces.create));
-  registerValidatedHandler(ipcMain, tierStudioChannels.workspaces.update, workspaceUpdatePayloadSchema, notImplemented(tierStudioChannels.workspaces.update));
+  registerValidatedHandler(ipcMain, tierStudioChannels.workspaces.list, voidPayloadSchema, () => coreServices().workspaces.list());
+  registerValidatedHandler(ipcMain, tierStudioChannels.workspaces.create, workspaceCreateInputSchema, (input) => coreServices().workspaces.create(input));
+  registerValidatedHandler(ipcMain, tierStudioChannels.workspaces.update, workspaceUpdatePayloadSchema, ({ id, patch }) => coreServices().workspaces.update(id, patch));
 
-  registerValidatedHandler(ipcMain, tierStudioChannels.lists.list, workspaceIdPayloadSchema, notImplemented(tierStudioChannels.lists.list));
-  registerValidatedHandler(ipcMain, tierStudioChannels.lists.get, idPayloadSchema, notImplemented(tierStudioChannels.lists.get));
-  registerValidatedHandler(ipcMain, tierStudioChannels.lists.create, listCreateInputSchema, notImplemented(tierStudioChannels.lists.create));
-  registerValidatedHandler(ipcMain, tierStudioChannels.lists.update, listUpdatePayloadSchema, notImplemented(tierStudioChannels.lists.update));
-  registerValidatedHandler(ipcMain, tierStudioChannels.lists.duplicate, idPayloadSchema, notImplemented(tierStudioChannels.lists.duplicate));
-  registerValidatedHandler(ipcMain, tierStudioChannels.lists.archive, idPayloadSchema, notImplemented(tierStudioChannels.lists.archive));
+  registerValidatedHandler(ipcMain, tierStudioChannels.lists.list, workspaceIdPayloadSchema, ({ workspaceId }) => coreServices().lists.list(workspaceId));
+  registerValidatedHandler(ipcMain, tierStudioChannels.lists.get, idPayloadSchema, ({ id }) => coreServices().lists.get(id));
+  registerValidatedHandler(ipcMain, tierStudioChannels.lists.create, listCreateInputSchema, (input) => coreServices().lists.create(input));
+  registerValidatedHandler(ipcMain, tierStudioChannels.lists.update, listUpdatePayloadSchema, ({ id, patch }) => coreServices().lists.update(id, patch));
+  registerValidatedHandler(ipcMain, tierStudioChannels.lists.duplicate, idPayloadSchema, ({ id }) => coreServices().lists.duplicate(id));
+  registerValidatedHandler(ipcMain, tierStudioChannels.lists.archive, idPayloadSchema, ({ id }) => coreServices().lists.archive(id));
 
-  registerValidatedHandler(ipcMain, tierStudioChannels.rows.insert, rowInsertPayloadSchema, notImplemented(tierStudioChannels.rows.insert));
-  registerValidatedHandler(ipcMain, tierStudioChannels.rows.update, rowUpdatePayloadSchema, notImplemented(tierStudioChannels.rows.update));
-  registerValidatedHandler(ipcMain, tierStudioChannels.rows.reorder, rowReorderPayloadSchema, notImplemented(tierStudioChannels.rows.reorder));
-  registerValidatedHandler(ipcMain, tierStudioChannels.rows.remove, rowIdPayloadSchema, notImplemented(tierStudioChannels.rows.remove));
+  registerValidatedHandler(ipcMain, tierStudioChannels.rows.insert, rowInsertPayloadSchema, ({ listId, input }) => coreServices().rows.insert(listId, input));
+  registerValidatedHandler(ipcMain, tierStudioChannels.rows.update, rowUpdatePayloadSchema, ({ rowId, patch }) => coreServices().rows.update(rowId, patch));
+  registerValidatedHandler(ipcMain, tierStudioChannels.rows.reorder, rowReorderPayloadSchema, ({ listId, rowIdsInOrder }) => coreServices().rows.reorder(listId, rowIdsInOrder));
+  registerValidatedHandler(ipcMain, tierStudioChannels.rows.remove, rowIdPayloadSchema, ({ rowId }) => coreServices().rows.remove(rowId));
 
-  registerValidatedHandler(ipcMain, tierStudioChannels.items.addTextBatch, addTextBatchPayloadSchema, notImplemented(tierStudioChannels.items.addTextBatch));
+  registerValidatedHandler(ipcMain, tierStudioChannels.items.addTextBatch, addTextBatchPayloadSchema, ({ listId, lines }) => coreServices().items.addTextBatch(listId, lines));
   registerValidatedHandler(ipcMain, tierStudioChannels.items.importAssets, importAssetsPayloadSchema, notImplemented(tierStudioChannels.items.importAssets));
-  registerValidatedHandler(ipcMain, tierStudioChannels.items.update, itemUpdatePayloadSchema, notImplemented(tierStudioChannels.items.update));
-  registerValidatedHandler(ipcMain, tierStudioChannels.items.remove, itemIdPayloadSchema, notImplemented(tierStudioChannels.items.remove));
-  registerValidatedHandler(ipcMain, tierStudioChannels.items.search, itemSearchInputSchema, notImplemented(tierStudioChannels.items.search));
+  registerValidatedHandler(ipcMain, tierStudioChannels.items.update, itemUpdatePayloadSchema, ({ itemId, patch }) => coreServices().items.update(itemId, patch));
+  registerValidatedHandler(ipcMain, tierStudioChannels.items.remove, itemIdPayloadSchema, ({ itemId }) => coreServices().items.remove(itemId));
+  registerValidatedHandler(ipcMain, tierStudioChannels.items.search, itemSearchInputSchema, (input) => coreServices().items.search(input));
 
-  registerValidatedHandler(ipcMain, tierStudioChannels.positions.move, positionMoveInputSchema, notImplemented(tierStudioChannels.positions.move));
-  registerValidatedHandler(ipcMain, tierStudioChannels.positions.normalize, listIdPayloadSchema, notImplemented(tierStudioChannels.positions.normalize));
+  registerValidatedHandler(ipcMain, tierStudioChannels.positions.move, positionMoveInputSchema, (input) => coreServices().positions.move(input));
+  registerValidatedHandler(ipcMain, tierStudioChannels.positions.normalize, listIdPayloadSchema, ({ listId }) => coreServices().positions.normalize(listId));
 
   registerValidatedHandler(ipcMain, tierStudioChannels.templates.list, voidPayloadSchema, notImplemented(tierStudioChannels.templates.list));
   registerValidatedHandler(ipcMain, tierStudioChannels.templates.createFromList, templateCreateFromListPayloadSchema, notImplemented(tierStudioChannels.templates.createFromList));

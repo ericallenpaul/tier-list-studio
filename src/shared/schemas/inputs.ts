@@ -164,7 +164,7 @@ export const rowIdPayloadSchema = z.object({ rowId: idSchema }).strict();
 
 export const addTextBatchPayloadSchema = z.object({
   listId: idSchema,
-  lines: z.array(nonEmptyStringSchema).min(1)
+  lines: z.array(z.string()).min(1)
 }).strict();
 
 export const importAssetsPayloadSchema = z.object({

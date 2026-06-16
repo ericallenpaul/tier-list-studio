@@ -4,7 +4,7 @@ import type { SqliteDatabase } from "../db/connection.js";
 import type { JsonObject, JsonValue } from "./types.js";
 
 export abstract class BaseRepository {
-  protected constructor(protected readonly db: SqliteDatabase) {}
+  constructor(protected readonly db: SqliteDatabase) {}
 
   protected now() {
     return new Date().toISOString();
