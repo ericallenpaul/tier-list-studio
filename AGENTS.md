@@ -15,14 +15,16 @@ Do not commit generated files, build output, or local tool caches.
 
 ## Build, Test, and Development Commands
 
-No build or test commands are defined yet. Add them to the project manifest when the implementation stack is chosen.
+Use pnpm through Corepack if a local pnpm shim is unavailable.
 
-Expected commands once tooling exists:
-
-- `npm run dev`: start the local development app.
-- `npm test`: run the automated test suite.
-- `npm run build`: create a production build.
-- `npm run lint`: run static checks and formatting validation.
+- `pnpm run dev`: start the Vite dev server and Electron app.
+- `pnpm run build`: typecheck and build renderer, main, and preload output.
+- `pnpm run build:electron`: compile Electron main and preload output only.
+- `pnpm test`: run the Vitest suite.
+- `pnpm run test:e2e`: run Playwright e2e tests.
+- `pnpm run lint`: run lightweight static validation.
+- `pnpm run typecheck`: run TypeScript without emitting files.
+- `pnpm run package:win`: build and package an unsigned Windows NSIS installer.
 
 Do not add undocumented scripts. List contributor-facing scripts here or in the README.
 
