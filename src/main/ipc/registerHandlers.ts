@@ -1,7 +1,7 @@
 import type { App } from "electron";
 import type { ZodType } from "zod";
 
-import { tierStudioChannels, type TierStudioChannel } from "../../preload/channelTypes.js";
+import { tierStudioChannels, type TierStudioChannel } from "../../preload/channelTypes.cjs";
 import {
   addTextBatchPayloadSchema,
   aiGenerateItemsInputSchema,
@@ -31,6 +31,7 @@ import {
   workspaceIdPayloadSchema,
   workspaceUpdatePayloadSchema
 } from "../../shared/schemas/inputs.js";
+import { voidPayloadSchema } from "../../shared/schemas/common.js";
 
 export interface IpcMainLike {
   handle: (channel: string, listener: (event: unknown, payload?: unknown) => unknown) => void;
@@ -41,11 +42,11 @@ export type ValidatedHandler<Input, Result> = (input: Input, event: unknown) => 
 export const registerValidatedHandler = <Input, Result>(
   ipcMain: IpcMainLike,
   channel: TierStudioChannel,
-  schema: ZodType<Input> | undefined,
+  schema: ZodType<Input>,
   handler: ValidatedHandler<Input, Result>
 ) => {
   ipcMain.handle(channel, (event, payload) => {
-    const input = schema ? schema.parse(payload) : (undefined as Input);
+    const input = schema.parse(payload);
     return handler(input, event);
   });
 };
@@ -55,8 +56,8 @@ const notImplemented = (channel: TierStudioChannel) => () => {
 };
 
 export const registerHandlers = (ipcMain: IpcMainLike, app: Pick<App, "getVersion" | "getPath">) => {
-  registerValidatedHandler(ipcMain, tierStudioChannels.app.getVersion, undefined, () => app.getVersion());
-  registerValidatedHandler(ipcMain, tierStudioChannels.app.getPaths, undefined, () => ({
+  registerValidatedHandler(ipcMain, tierStudioChannels.app.getVersion, voidPayloadSchema, () => app.getVersion());
+  registerValidatedHandler(ipcMain, tierStudioChannels.app.getPaths, voidPayloadSchema, () => ({
     userData: app.getPath("userData"),
     documents: app.getPath("documents"),
     temp: app.getPath("temp")
@@ -65,7 +66,7 @@ export const registerHandlers = (ipcMain: IpcMainLike, app: Pick<App, "getVersio
   registerValidatedHandler(ipcMain, tierStudioChannels.dialogs.openFiles, openFilesInputSchema, notImplemented(tierStudioChannels.dialogs.openFiles));
   registerValidatedHandler(ipcMain, tierStudioChannels.dialogs.saveFile, saveFileInputSchema, notImplemented(tierStudioChannels.dialogs.saveFile));
 
-  registerValidatedHandler(ipcMain, tierStudioChannels.workspaces.list, undefined, notImplemented(tierStudioChannels.workspaces.list));
+  registerValidatedHandler(ipcMain, tierStudioChannels.workspaces.list, voidPayloadSchema, notImplemented(tierStudioChannels.workspaces.list));
   registerValidatedHandler(ipcMain, tierStudioChannels.workspaces.create, workspaceCreateInputSchema, notImplemented(tierStudioChannels.workspaces.create));
   registerValidatedHandler(ipcMain, tierStudioChannels.workspaces.update, workspaceUpdatePayloadSchema, notImplemented(tierStudioChannels.workspaces.update));
 
@@ -90,7 +91,7 @@ export const registerHandlers = (ipcMain: IpcMainLike, app: Pick<App, "getVersio
   registerValidatedHandler(ipcMain, tierStudioChannels.positions.move, positionMoveInputSchema, notImplemented(tierStudioChannels.positions.move));
   registerValidatedHandler(ipcMain, tierStudioChannels.positions.normalize, listIdPayloadSchema, notImplemented(tierStudioChannels.positions.normalize));
 
-  registerValidatedHandler(ipcMain, tierStudioChannels.templates.list, undefined, notImplemented(tierStudioChannels.templates.list));
+  registerValidatedHandler(ipcMain, tierStudioChannels.templates.list, voidPayloadSchema, notImplemented(tierStudioChannels.templates.list));
   registerValidatedHandler(ipcMain, tierStudioChannels.templates.createFromList, templateCreateFromListPayloadSchema, notImplemented(tierStudioChannels.templates.createFromList));
   registerValidatedHandler(ipcMain, tierStudioChannels.templates.instantiate, templateInstantiatePayloadSchema, notImplemented(tierStudioChannels.templates.instantiate));
 
@@ -102,12 +103,12 @@ export const registerHandlers = (ipcMain: IpcMainLike, app: Pick<App, "getVersio
   registerValidatedHandler(ipcMain, tierStudioChannels.exports.exportPackage, listIdPayloadSchema, notImplemented(tierStudioChannels.exports.exportPackage));
   registerValidatedHandler(ipcMain, tierStudioChannels.exports.exportCsv, listIdPayloadSchema, notImplemented(tierStudioChannels.exports.exportCsv));
 
-  registerValidatedHandler(ipcMain, tierStudioChannels.backups.create, undefined, notImplemented(tierStudioChannels.backups.create));
+  registerValidatedHandler(ipcMain, tierStudioChannels.backups.create, voidPayloadSchema, notImplemented(tierStudioChannels.backups.create));
   registerValidatedHandler(ipcMain, tierStudioChannels.backups.restore, filePathPayloadSchema, notImplemented(tierStudioChannels.backups.restore));
 
-  registerValidatedHandler(ipcMain, tierStudioChannels.settings.get, undefined, notImplemented(tierStudioChannels.settings.get));
+  registerValidatedHandler(ipcMain, tierStudioChannels.settings.get, voidPayloadSchema, notImplemented(tierStudioChannels.settings.get));
   registerValidatedHandler(ipcMain, tierStudioChannels.settings.update, settingsUpdateInputSchema, notImplemented(tierStudioChannels.settings.update));
 
-  registerValidatedHandler(ipcMain, tierStudioChannels.ai.getProviders, undefined, notImplemented(tierStudioChannels.ai.getProviders));
+  registerValidatedHandler(ipcMain, tierStudioChannels.ai.getProviders, voidPayloadSchema, notImplemented(tierStudioChannels.ai.getProviders));
   registerValidatedHandler(ipcMain, tierStudioChannels.ai.generateItems, aiGenerateItemsInputSchema, notImplemented(tierStudioChannels.ai.generateItems));
 };

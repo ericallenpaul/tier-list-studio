@@ -5,6 +5,7 @@ export const isoTimestampSchema = z.string().datetime({ offset: true });
 export const jsonRecordSchema = z.record(z.string(), z.unknown());
 export const nonEmptyStringSchema = z.string().trim().min(1);
 export const filePathSchema = z.string().trim().min(1);
+export const voidPayloadSchema = z.undefined();
 
 export const optionalTextSchema = z.string().trim().optional();
 

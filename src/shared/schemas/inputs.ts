@@ -13,7 +13,7 @@ import {
 
 export const workspaceCreateInputSchema = z.object({
   name: nonEmptyStringSchema
-});
+}).strict();
 
 export const workspaceUpdateInputSchema = z
   .object({
@@ -27,7 +27,7 @@ export const listCreateInputSchema = z.object({
   name: nonEmptyStringSchema,
   description: optionalTextSchema,
   templateId: idSchema.optional()
-});
+}).strict();
 
 export const listUpdateInputSchema = z
   .object({
@@ -43,7 +43,7 @@ export const rowInsertInputSchema = z.object({
   color: colorSchema,
   afterRowId: idSchema.optional(),
   style: jsonRecordSchema.optional()
-});
+}).strict();
 
 export const rowUpdateInputSchema = z
   .object({
@@ -68,14 +68,14 @@ export const itemSearchInputSchema = z.object({
   workspaceId: idSchema.optional(),
   listId: idSchema.optional(),
   kinds: z.array(itemKindSchema).min(1).optional()
-});
+}).strict();
 
 export const positionMoveInputSchema = z.object({
   listId: idSchema,
   itemIds: z.array(idSchema).min(1),
   targetRowId: idSchema,
   targetIndex: nonNegativeIntegerSchema
-});
+}).strict();
 
 export const renderImageInputSchema = z.object({
   listId: idSchema,
@@ -85,7 +85,7 @@ export const renderImageInputSchema = z.object({
   width: positiveIntegerSchema.optional(),
   height: positiveIntegerSchema.optional(),
   transparentBackground: z.boolean().default(false)
-});
+}).strict();
 
 export const openFilesInputSchema = z.object({
   title: z.string().trim().optional(),
@@ -95,24 +95,24 @@ export const openFilesInputSchema = z.object({
       z.object({
         name: nonEmptyStringSchema,
         extensions: z.array(nonEmptyStringSchema).min(1)
-      })
+      }).strict()
     )
     .optional(),
   multiple: z.boolean().default(false)
-});
+}).strict();
 
 export const saveFileInputSchema = z.object({
   title: z.string().trim().optional(),
   defaultPath: filePathSchema.optional(),
   filters: openFilesInputSchema.shape.filters
-});
+}).strict();
 
 export const aiGenerateItemsInputSchema = z.object({
   providerId: idSchema,
   prompt: z.string().trim().min(1).max(4000),
   count: z.number().int().min(1).max(200).default(20),
   contextListId: idSchema.optional()
-});
+}).strict();
 
 export const settingsUpdateInputSchema = z
   .object({
@@ -125,77 +125,78 @@ export const settingsUpdateInputSchema = z
         preferredProviderId: idSchema.optional(),
         enabled: z.boolean().optional()
       })
+      .strict()
       .optional()
   })
   .strict();
 
-export const idPayloadSchema = z.object({ id: idSchema });
-export const listIdPayloadSchema = z.object({ listId: idSchema });
-export const workspaceIdPayloadSchema = z.object({ workspaceId: idSchema });
-export const filePathPayloadSchema = z.object({ filePath: filePathSchema });
+export const idPayloadSchema = z.object({ id: idSchema }).strict();
+export const listIdPayloadSchema = z.object({ listId: idSchema }).strict();
+export const workspaceIdPayloadSchema = z.object({ workspaceId: idSchema }).strict();
+export const filePathPayloadSchema = z.object({ filePath: filePathSchema }).strict();
 
 export const workspaceUpdatePayloadSchema = z.object({
   id: idSchema,
   patch: workspaceUpdateInputSchema
-});
+}).strict();
 
 export const listUpdatePayloadSchema = z.object({
   id: idSchema,
   patch: listUpdateInputSchema
-});
+}).strict();
 
 export const rowInsertPayloadSchema = z.object({
   listId: idSchema,
   input: rowInsertInputSchema
-});
+}).strict();
 
 export const rowUpdatePayloadSchema = z.object({
   rowId: idSchema,
   patch: rowUpdateInputSchema
-});
+}).strict();
 
 export const rowReorderPayloadSchema = z.object({
   listId: idSchema,
   rowIdsInOrder: z.array(idSchema).min(1)
-});
+}).strict();
 
-export const rowIdPayloadSchema = z.object({ rowId: idSchema });
+export const rowIdPayloadSchema = z.object({ rowId: idSchema }).strict();
 
 export const addTextBatchPayloadSchema = z.object({
   listId: idSchema,
   lines: z.array(nonEmptyStringSchema).min(1)
-});
+}).strict();
 
 export const importAssetsPayloadSchema = z.object({
   listId: idSchema,
   filePaths: z.array(filePathSchema).min(1)
-});
+}).strict();
 
 export const itemUpdatePayloadSchema = z.object({
   itemId: idSchema,
   patch: itemUpdateInputSchema
-});
+}).strict();
 
-export const itemIdPayloadSchema = z.object({ itemId: idSchema });
+export const itemIdPayloadSchema = z.object({ itemId: idSchema }).strict();
 
 export const templateCreateFromListPayloadSchema = z.object({
   listId: idSchema,
   name: nonEmptyStringSchema
-});
+}).strict();
 
 export const templateInstantiatePayloadSchema = z.object({
   templateId: idSchema,
   workspaceId: idSchema
-});
+}).strict();
 
 export const snapshotCreatePayloadSchema = z.object({
   listId: idSchema,
   label: nonEmptyStringSchema
-});
+}).strict();
 
 export const snapshotIdPayloadSchema = z.object({
   snapshotId: idSchema
-});
+}).strict();
 
 export type WorkspaceCreateInput = z.infer<typeof workspaceCreateInputSchema>;
 export type WorkspaceUpdateInput = z.infer<typeof workspaceUpdateInputSchema>;

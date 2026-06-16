@@ -1,5 +1,5 @@
 import type { TierStudioApi } from "../shared/contracts/tierStudioApi.js";
-import { tierStudioChannels, type IpcInvoke } from "./channelTypes.js";
+import { tierStudioChannels, type IpcInvoke } from "./channelTypes.cjs";
 
 export const createTierStudioApi = (invoke: IpcInvoke): TierStudioApi => ({
   app: {
