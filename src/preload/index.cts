@@ -1,3 +1,7 @@
-import { contextBridge } from "electron";
+import { contextBridge, ipcRenderer } from "electron";
 
-contextBridge.exposeInMainWorld("tierStudio", {});
+contextBridge.exposeInMainWorld("tierStudio", {
+  app: {
+    getVersion: () => ipcRenderer.invoke("app:getVersion") as Promise<string>
+  }
+});
