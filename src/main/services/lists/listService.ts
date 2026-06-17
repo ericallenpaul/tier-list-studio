@@ -270,7 +270,12 @@ export const createCoreListServices = (db: SqliteDatabase): CoreListServices => 
         const reordered = db.transaction(() => {
           const existingRows = rows.listByTierList(listId);
           const existingIds = new Set(existingRows.map((row) => row.id));
-          if (rowIdsInOrder.length !== existingRows.length || rowIdsInOrder.some((rowId) => !existingIds.has(rowId))) {
+          const uniqueRowIds = new Set(rowIdsInOrder);
+          if (
+            rowIdsInOrder.length !== existingRows.length
+            || uniqueRowIds.size !== rowIdsInOrder.length
+            || rowIdsInOrder.some((rowId) => !existingIds.has(rowId))
+          ) {
             throw new Error(`Row reorder payload must include every row in tier list ${listId}`);
           }
           rewriteRows(rows, listId, existingRows, 1000);

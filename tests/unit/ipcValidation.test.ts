@@ -137,13 +137,13 @@ describe("representative IPC input schemas", () => {
       positionMoveInputSchema.parse({
         listId: "list-1",
         itemIds: ["item-1", "item-2"],
-        targetRowId: "row-1",
+        targetRowId: null,
         targetIndex: 0
       })
     ).toEqual({
       listId: "list-1",
       itemIds: ["item-1", "item-2"],
-      targetRowId: "row-1",
+      targetRowId: null,
       targetIndex: 0
     });
   });

@@ -73,7 +73,7 @@ export const itemSearchInputSchema = z.object({
 export const positionMoveInputSchema = z.object({
   listId: idSchema,
   itemIds: z.array(idSchema).min(1),
-  targetRowId: idSchema,
+  targetRowId: idSchema.nullable(),
   targetIndex: nonNegativeIntegerSchema
 }).strict();
 

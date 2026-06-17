@@ -83,6 +83,8 @@ describe("core list services and IPC", () => {
 
     const rows = new RowRepository(db).listByTierList(list.id);
     expect(rows.map((row) => row.label)).toEqual(["S", "A", "B", "C", "D"]);
+    expect(() => api.rows.reorder(list.id, [rows[0].id, rows[0].id, rows[2].id, rows[3].id, rows[4].id]))
+      .toThrow();
 
     const items = await api.items.addTextBatch(list.id, ["Ramen", "  ", "Coffee", "Pizza"]);
     expect(items.map((item) => item.label)).toEqual(["Ramen", "Coffee", "Pizza"]);
@@ -97,6 +99,7 @@ describe("core list services and IPC", () => {
       items[1].id,
       items[0].id
     ]);
+    expect(moved.filter((position) => position.rowId === null).map((position) => position.itemId)).toEqual([items[2].id]);
 
     const duplicated = await api.lists.duplicate(list.id);
     expect(duplicated).toEqual(expect.objectContaining({
@@ -124,5 +127,6 @@ describe("core list services and IPC", () => {
       items[1].id,
       items[0].id
     ]);
+    expect(reopenedPositions.filter((position) => position.rowId === null).map((position) => position.itemId)).toEqual([items[2].id]);
   });
 });

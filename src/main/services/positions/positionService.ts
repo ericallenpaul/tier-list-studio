@@ -4,9 +4,7 @@ import type { SqliteDatabase } from "../db/connection.js";
 import { ListRepository, PositionRepository, RowRepository } from "../repositories/index.js";
 import type { ItemPositionRecord } from "../repositories/types.js";
 
-const poolRowId = "pool";
-
-type ContainerKey = typeof poolRowId | string;
+type ContainerKey = string | null;
 
 export interface PositionService {
   move(input: PositionMoveInput): TierPosition[];
@@ -26,8 +24,8 @@ export const createPositionService = (db: SqliteDatabase): PositionService => {
       positions.upsert({
         itemId: position.itemId,
         tierListId: listId,
-        containerType: key === poolRowId ? "pool" : "tier",
-        tierRowId: key === poolRowId ? null : key,
+        containerType: key === null ? "pool" : "tier",
+        tierRowId: key,
         sortOrder: index
       });
     });
@@ -39,7 +37,7 @@ export const createPositionService = (db: SqliteDatabase): PositionService => {
     }
 
     const normalize = db.transaction(() => {
-      normalizeContainer(listId, poolRowId);
+      normalizeContainer(listId, null);
       for (const row of rows.listByTierList(listId)) {
         normalizeContainer(listId, row.id);
       }
@@ -56,8 +54,8 @@ export const createPositionService = (db: SqliteDatabase): PositionService => {
           throw new Error(`Tier list not found: ${input.listId}`);
         }
 
-        const targetKey = input.targetRowId === poolRowId ? poolRowId : input.targetRowId;
-        if (targetKey !== poolRowId) {
+        const targetKey = input.targetRowId;
+        if (targetKey !== null) {
           const targetRow = rows.get(targetKey);
           if (!targetRow || targetRow.tierListId !== input.listId) {
             throw new Error(`Target row not found in tier list ${input.listId}: ${targetKey}`);
@@ -107,8 +105,8 @@ export const createPositionService = (db: SqliteDatabase): PositionService => {
           ...selected.map((itemId, offset) => ({
             itemId,
             tierListId: input.listId,
-            containerType: targetKey === poolRowId ? "pool" as const : "tier" as const,
-            tierRowId: targetKey === poolRowId ? null : targetKey,
+            containerType: targetKey === null ? "pool" as const : "tier" as const,
+            tierRowId: targetKey,
             sortOrder: insertAt + offset,
             updatedAt: new Date().toISOString()
           }))
@@ -121,8 +119,8 @@ export const createPositionService = (db: SqliteDatabase): PositionService => {
             positions.upsert({
               itemId: position.itemId,
               tierListId: input.listId,
-              containerType: key === poolRowId ? "pool" : "tier",
-              tierRowId: key === poolRowId ? null : key,
+              containerType: key === null ? "pool" : "tier",
+              tierRowId: key,
               sortOrder: index
             });
           });
@@ -139,7 +137,7 @@ export const createPositionService = (db: SqliteDatabase): PositionService => {
 export const mapPosition = (position: ItemPositionRecord): TierPosition => ({
   id: position.itemId,
   listId: position.tierListId,
-  rowId: position.tierRowId ?? poolRowId,
+  rowId: position.tierRowId,
   itemId: position.itemId,
   sortOrder: position.sortOrder,
   createdAt: position.updatedAt,
@@ -149,7 +147,7 @@ export const mapPosition = (position: ItemPositionRecord): TierPosition => ({
 export const mapPositions = (records: ItemPositionRecord[]) => records.map(mapPosition);
 
 const listPositionsForContainer = (db: SqliteDatabase, listId: string, key: ContainerKey) => {
-  const rows = key === poolRowId
+  const rows = key === null
     ? db.prepare(`
         SELECT item_id, tier_list_id, container_type, tier_row_id, sort_order, updated_at
         FROM item_positions
@@ -180,7 +178,7 @@ const listPositionsForContainer = (db: SqliteDatabase, listId: string, key: Cont
   }));
 };
 
-const containerKey = (position: ItemPositionRecord): ContainerKey => position.tierRowId ?? poolRowId;
+const containerKey = (position: ItemPositionRecord): ContainerKey => position.tierRowId;
 
 const comparePositions = (first: ItemPositionRecord, second: ItemPositionRecord) =>
   first.sortOrder - second.sortOrder || first.itemId.localeCompare(second.itemId);

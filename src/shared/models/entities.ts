@@ -49,7 +49,7 @@ export interface TierItem {
 export interface TierPosition {
   id: EntityId;
   listId: EntityId;
-  rowId: EntityId;
+  rowId: EntityId | null;
   itemId: EntityId;
   sortOrder: number;
   createdAt: IsoTimestamp;
