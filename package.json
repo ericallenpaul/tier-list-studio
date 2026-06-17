@@ -1,0 +1,51 @@
+{
+  "name": "tier-list-studio",
+  "version": "0.1.0",
+  "description": "Local-first desktop app for creating polished tier lists.",
+  "type": "module",
+  "main": "dist/main/index.js",
+  "private": true,
+  "packageManager": "pnpm@10.12.4",
+  "scripts": {
+    "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on tcp:5173 && corepack pnpm run build:electron && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .\"",
+    "build": "tsc --noEmit && vite build && corepack pnpm run build:electron",
+    "build:electron": "node -e \"fs.rmSync('dist/main',{recursive:true,force:true});fs.rmSync('dist/preload',{recursive:true,force:true})\" && tsc --target ES2022 --module NodeNext --moduleResolution NodeNext --strict --skipLibCheck --esModuleInterop --types node --outDir dist --rootDir src src/main/index.ts && node scripts/copy-db-schema.mjs && esbuild src/preload/index.cts --bundle --platform=node --format=cjs --target=es2022 --outfile=dist/preload/index.cjs --external:electron",
+    "test": "vitest run --passWithNoTests",
+    "test:e2e": "playwright test --pass-with-no-tests",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "package:win": "corepack pnpm run build && electron-builder --win nsis"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.53.1",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.0.3",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "concurrently": "^9.2.0",
+    "cross-env": "^7.0.3",
+    "electron": "^36.4.0",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.28.1",
+    "pnpm": "10.12.4",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4",
+    "wait-on": "^8.0.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "electron",
+      "electron-winstaller",
+      "esbuild"
+    ]
+  }
+}

@@ -2,27 +2,29 @@
 
 ## Project Structure & Module Organization
 
-This repository is currently specification-first. The only project artifact is `Tier List Studio Desktop Specification.pdf`, which should be treated as the source of product requirements until implementation files are added.
+This repository now contains the initial Electron + Vite + React + TypeScript scaffold for Tier List Studio. Product requirements remain in the design spec under `docs/superpowers/specs/`, with implementation sequencing in `docs/superpowers/plans/`.
 
-When source code is introduced, keep the layout conventional:
+Keep the layout conventional:
 
 - `src/` for application code.
 - `tests/` for automated tests.
 - `assets/` for images, icons, sample data, and static resources.
-- `docs/` for supporting design notes beyond the main specification.
+- `docs/` for supporting design notes, specs, and implementation plans.
 
 Do not commit generated files, build output, or local tool caches.
 
 ## Build, Test, and Development Commands
 
-No build or test commands are defined yet. Add them to the project manifest when the implementation stack is chosen.
+Use pnpm through Corepack if a local pnpm shim is unavailable.
 
-Expected commands once tooling exists:
-
-- `npm run dev`: start the local development app.
-- `npm test`: run the automated test suite.
-- `npm run build`: create a production build.
-- `npm run lint`: run static checks and formatting validation.
+- `pnpm run dev`: start the Vite dev server and Electron app.
+- `pnpm run build`: typecheck and build renderer, main, and preload output.
+- `pnpm run build:electron`: compile Electron main and preload output only.
+- `pnpm test`: run the Vitest suite.
+- `pnpm run test:e2e`: run Playwright e2e tests.
+- `pnpm run lint`: run lightweight static validation.
+- `pnpm run typecheck`: run TypeScript without emitting files.
+- `pnpm run package:win`: build and package an unsigned Windows NSIS installer.
 
 Do not add undocumented scripts. List contributor-facing scripts here or in the README.
 
@@ -41,7 +43,7 @@ Add a formatter and linter early, then run them before opening a pull request.
 
 ## Testing Guidelines
 
-No test framework is configured yet. When code is added, include tests with the related feature or bug fix.
+Vitest and Playwright are configured. When code is added, include tests with the related feature or bug fix.
 
 Use behavior-focused test names, for example `creates-tier-from-dropped-image` or `exports-list-as-png`. Co-locate tests when the framework favors it, or place integration tests under `tests/`.
 

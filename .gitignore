@@ -5,6 +5,8 @@ dist-electron/
 release/
 out/
 coverage/
+playwright-report/
+test-results/
 .env
 .env.*
 *.log
