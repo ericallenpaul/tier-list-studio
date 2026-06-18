@@ -43,7 +43,7 @@ import { exportPackageArtifact } from "../services/export/exportPackageService.j
 import { createCoreListServices, type CoreListServices } from "../services/lists/listService.js";
 import type { RenderImageInput } from "../../shared/models/api.js";
 import type { TierList, TierTemplate } from "../../shared/models/entities.js";
-import { SettingsRepository, TemplateRepository } from "../services/repositories/index.js";
+import { AssetRepository, SettingsRepository, TemplateRepository } from "../services/repositories/index.js";
 import type { JsonObject, TemplateRecord, TierListRecord } from "../services/repositories/types.js";
 
 export interface IpcMainLike {
@@ -66,6 +66,10 @@ export const registerValidatedHandler = <Input, Result>(
 
 const notImplemented = (channel: TierStudioChannel) => () => {
   throw new Error(`IPC channel is not implemented yet: ${channel}`);
+};
+
+const backupDeferred = () => {
+  throw new Error("Backup and restore are deferred for this release; see docs/manual-packaging.md.");
 };
 
 let productionDb: SqliteDatabase | undefined;
@@ -303,7 +307,9 @@ export const registerHandlers = (
 
     return exportPackageArtifact(list, {
       appVersion: app.getVersion(),
-      documentsPath: app.getPath("documents")
+      assetRecords: new AssetRepository(database()).list(),
+      documentsPath: app.getPath("documents"),
+      userDataPath: app.getPath("userData")
     });
   });
   registerValidatedHandler(ipcMain, tierStudioChannels.exports.exportCsv, listIdPayloadSchema, async ({ listId }) => {
@@ -319,8 +325,8 @@ export const registerHandlers = (
     return exportCsvArtifact(list, { documentsPath: app.getPath("documents") });
   });
 
-  registerValidatedHandler(ipcMain, tierStudioChannels.backups.create, voidPayloadSchema, notImplemented(tierStudioChannels.backups.create));
-  registerValidatedHandler(ipcMain, tierStudioChannels.backups.restore, filePathPayloadSchema, notImplemented(tierStudioChannels.backups.restore));
+  registerValidatedHandler(ipcMain, tierStudioChannels.backups.create, voidPayloadSchema, backupDeferred);
+  registerValidatedHandler(ipcMain, tierStudioChannels.backups.restore, filePathPayloadSchema, backupDeferred);
 
   registerValidatedHandler(ipcMain, tierStudioChannels.settings.get, voidPayloadSchema, () =>
     options.services?.settings?.get ? options.services.settings.get() : new SettingsRepository(database()).getUserSettings());

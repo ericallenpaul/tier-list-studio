@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -9,16 +9,19 @@ import { exportPackageArtifact } from "../../src/main/services/export/exportPack
 import { closeDatabase, openDatabase, type SqliteDatabase } from "../../src/main/services/db/connection.js";
 import { runMigrations } from "../../src/main/services/db/migrations.js";
 import { createCoreListServices } from "../../src/main/services/lists/listService.js";
+import { AssetRepository } from "../../src/main/services/repositories/index.js";
 
 let tempDir: string;
 let db: SqliteDatabase;
 let services: ReturnType<typeof createCoreListServices>;
 
+const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
 beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), "tier-list-studio-exports-"));
   db = openDatabase({ filePath: join(tempDir, "exports.sqlite") });
   runMigrations(db);
-  services = createCoreListServices(db);
+  services = createCoreListServices(db, { userDataPath: tempDir });
 });
 
 afterEach(async () => {
@@ -75,6 +78,68 @@ describe("export services", () => {
     expect(packageData.rows).toHaveLength(5);
     expect(packageData.items.map((item) => item.label).sort()).toEqual(["Pasta", "Pizza"]);
     expect(packageData.positions).toHaveLength(2);
+  });
+
+  it("writes media asset records and managed file content into package exports", async () => {
+    const imagePath = join(tempDir, "source pizza.png");
+    writeFileSync(imagePath, pngBytes);
+
+    const workspace = services.workspaces.create({ name: "Rankings" });
+    const createdList = services.lists.create({ workspaceId: workspace.id, name: "Media Exports" });
+    const [importedItem] = await services.items.importAssets(createdList.id, [imagePath]);
+    const list = services.lists.get(createdList.id);
+    if (!list) {
+      throw new Error("Expected media export list.");
+    }
+
+    const artifact = await exportPackageArtifact(list, {
+      appVersion: "0.1.0-test",
+      assetRecords: new AssetRepository(db).list(),
+      documentsPath: tempDir,
+      userDataPath: tempDir
+    });
+
+    const packageData = JSON.parse(readFileSync(artifact.filePath, "utf8")) as {
+      assets: Array<{
+        id: string;
+        originalName: string;
+        mimeType: string;
+        managedRelPath: string;
+        file: {
+          kind: string;
+          managedRelPath: string;
+          managedPathExists: boolean;
+          sourcePathExists: boolean;
+          encoding?: string;
+          contentBase64?: string;
+        };
+      }>;
+      items: Array<{ id: string; assetId?: string; metadata: { managedRelPath?: string } }>;
+    };
+
+    expect(packageData.items).toEqual([
+      expect.objectContaining({
+        id: importedItem.id,
+        assetId: importedItem.assetId,
+        metadata: expect.objectContaining({ managedRelPath: expect.any(String) })
+      })
+    ]);
+    expect(packageData.assets).toEqual([
+      expect.objectContaining({
+        id: importedItem.assetId,
+        originalName: "source pizza.png",
+        mimeType: "image/png",
+        managedRelPath: expect.stringMatching(/^assets[\\/][a-f0-9]{64}\.png$/),
+        file: expect.objectContaining({
+          kind: "embedded",
+          managedPathExists: true,
+          sourcePathExists: true,
+          encoding: "base64",
+          contentBase64: pngBytes.toString("base64")
+        })
+      })
+    ]);
+    expect(packageData.assets[0].file.managedRelPath).toBe(packageData.assets[0].managedRelPath);
   });
 });
 
