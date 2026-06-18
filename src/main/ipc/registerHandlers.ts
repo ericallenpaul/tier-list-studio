@@ -37,6 +37,7 @@ import {
 import { voidPayloadSchema } from "../../shared/schemas/common.js";
 import { openDatabase, type SqliteDatabase } from "../services/db/connection.js";
 import { runMigrations } from "../services/db/migrations.js";
+import { createDefaultAiProviderRegistry } from "../services/ai/providerRegistry.js";
 import { createCoreListServices, type CoreListServices } from "../services/lists/listService.js";
 import type { RenderImageInput } from "../../shared/models/api.js";
 import type { TierList, TierTemplate } from "../../shared/models/entities.js";
@@ -299,16 +300,32 @@ export const registerHandlers = (
   registerValidatedHandler(ipcMain, tierStudioChannels.settings.update, settingsUpdateInputSchema, (input) =>
     options.services?.settings?.update ? options.services.settings.update(input) : new SettingsRepository(database()).updateUserSettings(input));
 
-  registerValidatedHandler(ipcMain, tierStudioChannels.ai.getProviders, voidPayloadSchema, () =>
-    options.services?.ai?.getProviders
-      ? options.services.ai.getProviders()
-      : [{
-          id: "openai",
-          name: "OpenAI",
-          configured: new SettingsRepository(database()).hasOpenAiApiKey(),
-          capabilities: ["generate-items" as const]
-        }]);
-  registerValidatedHandler(ipcMain, tierStudioChannels.ai.generateItems, aiGenerateItemsInputSchema, notImplemented(tierStudioChannels.ai.generateItems));
+  registerValidatedHandler(ipcMain, tierStudioChannels.ai.getProviders, voidPayloadSchema, () => {
+    if (options.services?.ai?.getProviders) {
+      return options.services.ai.getProviders();
+    }
+
+    const registry = createDefaultAiProviderRegistry({
+      openAiApiKeyConfigured: new SettingsRepository(database()).hasOpenAiApiKey()
+    });
+
+    return registry.listProviders().map((provider) => ({
+      id: provider.id,
+      name: provider.label,
+      configured: provider.configured,
+      capabilities: ["generate-items" as const]
+    }));
+  });
+  registerValidatedHandler(ipcMain, tierStudioChannels.ai.generateItems, aiGenerateItemsInputSchema, (input) => {
+    if (options.services?.ai?.generateItems) {
+      return options.services.ai.generateItems(input);
+    }
+
+    const registry = createDefaultAiProviderRegistry({
+      openAiApiKeyConfigured: new SettingsRepository(database()).hasOpenAiApiKey()
+    });
+    return registry.generateItems(input);
+  });
 };
 
 const mapTemplate = (template: TemplateRecord): TierTemplate => {

@@ -906,7 +906,8 @@ button {
   font: inherit;
 }
 
-.modal-body input {
+.modal-body input,
+.modal-body select {
   width: 100%;
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 8px;
@@ -914,6 +915,35 @@ button {
   color: #f8fafc;
   padding: 10px 12px;
   font: inherit;
+}
+
+.review-list {
+  display: grid;
+  gap: 8px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.review-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.36);
+  color: #e2e8f0;
+  padding: 9px 10px;
+}
+
+.review-row input {
+  width: auto;
+}
+
+.modal-note {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.85rem;
 }
 
 .modal-body input[type="color"] {

@@ -652,4 +652,12 @@ const isSupportedMediaSignature = (extension: string, header: Buffer) => {
   }
 };
 
-const escapeFtsQuery = (query: string) => `"${query.replace(/"/g, "\"\"")}"`;
+const escapeFtsQuery = (query: string) => {
+  const tokens = query
+    .trim()
+    .split(/\s+/)
+    .map((token) => token.replace(/[^A-Za-z0-9_-]/g, ""))
+    .filter(Boolean);
+
+  return tokens.length > 0 ? tokens.map((token) => `${token}*`).join(" ") : "__tier_list_studio_no_match__";
+};
