@@ -1,4 +1,4 @@
-import type { App } from "electron";
+import { dialog, type App } from "electron";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { ZodType } from "zod";
@@ -69,7 +69,7 @@ const getProductionCoreServices = (app: Pick<App, "getPath">) => {
   if (!productionCoreServices) {
     productionDb = openDatabase({ filePath: join(app.getPath("userData"), "tier-list-studio.sqlite") });
     runMigrations(productionDb);
-    productionCoreServices = createCoreListServices(productionDb);
+    productionCoreServices = createCoreListServices(productionDb, { userDataPath: app.getPath("userData") });
   }
 
   return productionCoreServices;
@@ -127,7 +127,19 @@ export const registerHandlers = (
     temp: app.getPath("temp")
   }));
 
-  registerValidatedHandler(ipcMain, tierStudioChannels.dialogs.openFiles, openFilesInputSchema, notImplemented(tierStudioChannels.dialogs.openFiles));
+  registerValidatedHandler(ipcMain, tierStudioChannels.dialogs.openFiles, openFilesInputSchema, async (input) => {
+    const result = await dialog.showOpenDialog({
+      title: input.title,
+      defaultPath: input.defaultPath,
+      filters: input.filters,
+      properties: input.multiple ? ["openFile", "multiSelections"] : ["openFile"]
+    });
+
+    return {
+      canceled: result.canceled,
+      filePaths: result.filePaths
+    };
+  });
   registerValidatedHandler(ipcMain, tierStudioChannels.dialogs.saveFile, saveFileInputSchema, notImplemented(tierStudioChannels.dialogs.saveFile));
 
   registerValidatedHandler(ipcMain, tierStudioChannels.workspaces.list, voidPayloadSchema, () => coreServices().workspaces.list());
@@ -147,7 +159,7 @@ export const registerHandlers = (
   registerValidatedHandler(ipcMain, tierStudioChannels.rows.remove, rowIdPayloadSchema, ({ rowId }) => coreServices().rows.remove(rowId));
 
   registerValidatedHandler(ipcMain, tierStudioChannels.items.addTextBatch, addTextBatchPayloadSchema, ({ listId, lines }) => coreServices().items.addTextBatch(listId, lines));
-  registerValidatedHandler(ipcMain, tierStudioChannels.items.importAssets, importAssetsPayloadSchema, notImplemented(tierStudioChannels.items.importAssets));
+  registerValidatedHandler(ipcMain, tierStudioChannels.items.importAssets, importAssetsPayloadSchema, ({ listId, filePaths }) => coreServices().items.importAssets(listId, filePaths));
   registerValidatedHandler(ipcMain, tierStudioChannels.items.update, itemUpdatePayloadSchema, ({ itemId, patch }) => coreServices().items.update(itemId, patch));
   registerValidatedHandler(ipcMain, tierStudioChannels.items.remove, itemIdPayloadSchema, ({ itemId }) => coreServices().items.remove(itemId));
   registerValidatedHandler(ipcMain, tierStudioChannels.items.search, itemSearchInputSchema, (input) => coreServices().items.search(input));

@@ -55,10 +55,9 @@ test.describe("dashboard editor flow", () => {
     await page.getByRole("button", { name: "Create" }).click();
     await expect(page.getByRole("heading", { name: "Reload Survival" })).toBeVisible();
 
-    await page.evaluate((name) => {
-      window.prompt = () => name;
-    }, itemName);
-    await page.getByRole("button", { name: "New item" }).click();
+    await page.getByRole("button", { name: "Add Items" }).click();
+    await page.getByLabel("Items").fill(itemName);
+    await page.getByRole("button", { name: "Add 1 Item" }).click();
     await expect(page.getByRole("button", { name: itemName })).toBeVisible();
 
     await page.getByRole("button", { name: itemName }).click();

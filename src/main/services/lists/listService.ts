@@ -1,3 +1,7 @@
+import { createHash } from "node:crypto";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { basename, extname, join } from "node:path";
+
 import type { TierStudioServices } from "../../../shared/contracts/tierStudioApi.js";
 import type { TierItem, TierItemKind, TierList, TierRow, Workspace } from "../../../shared/models/entities.js";
 import type {
@@ -12,6 +16,7 @@ import type {
 } from "../../../shared/schemas/inputs.js";
 import type { SqliteDatabase } from "../db/connection.js";
 import {
+  AssetRepository,
   ItemRepository,
   ListRepository,
   PositionRepository,
@@ -32,14 +37,20 @@ const defaultRows = [
 
 export type CoreListServices = Pick<TierStudioServices, "workspaces" | "lists" | "rows" | "items" | "positions">;
 
-export const createCoreListServices = (db: SqliteDatabase): CoreListServices => {
+type CoreListServiceOptions = {
+  userDataPath?: string;
+};
+
+export const createCoreListServices = (db: SqliteDatabase, options: CoreListServiceOptions = {}): CoreListServices => {
   const workspaces = new WorkspaceRepository(db);
   const lists = new ListRepository(db);
   const rows = new RowRepository(db);
   const items = new ItemRepository(db);
   const positions = new PositionRepository(db);
+  const assets = new AssetRepository(db);
   const search = new SearchRepository(db);
   const positionService = createPositionService(db);
+  const userDataPath = options.userDataPath ?? process.cwd();
 
   const syncListSearch = (list: TierListRecord) => {
     search.replace({
@@ -228,7 +239,7 @@ export const createCoreListServices = (db: SqliteDatabase): CoreListServices => 
       list: (workspaceId: string) => lists.listByWorkspace(workspaceId).map(mapList),
       get: (id: string) => {
         const list = lists.get(id);
-        return list ? mapList(list) : undefined;
+        return list ? { ...mapList(list), items: items.listByTierList(id).map(mapItem) } : undefined;
       },
       create: createList,
       update: updateList,
@@ -313,8 +324,54 @@ export const createCoreListServices = (db: SqliteDatabase): CoreListServices => 
         });
         return created().map(mapItem);
       },
-      importAssets: () => {
-        throw new Error("Asset import is not implemented yet.");
+      importAssets: (listId: string, filePaths: string[]) => {
+        const imported = db.transaction(() => {
+          if (!lists.get(listId)) {
+            throw new Error(`Tier list not found: ${listId}`);
+          }
+
+          const startOrder = maxSortOrder(db, listId, null) + 1;
+          return filePaths.map((filePath, index) => {
+            const media = inspectMediaFile(filePath);
+            const asset = assets.getOrCreate({
+              sha256: media.sha256,
+              originalName: media.originalName,
+              mimeType: media.mimeType,
+              extension: media.extension,
+              byteSize: media.byteSize,
+              sourcePath: filePath,
+              managedRelPath: media.managedRelPath,
+              metadata: { importedAt: new Date().toISOString() }
+            });
+            const managedPath = join(userDataPath, asset.managedRelPath);
+            mkdirSync(join(userDataPath, "assets"), { recursive: true });
+            if (!existsSync(managedPath)) {
+              copyFileSync(filePath, managedPath);
+            }
+
+            const item = items.create({
+              tierListId: listId,
+              sourceType: media.kind,
+              label: media.label,
+              assetId: asset.id,
+              metadata: {
+                originalName: media.originalName,
+                mimeType: media.mimeType,
+                managedRelPath: asset.managedRelPath
+              }
+            });
+            positions.upsert({
+              itemId: item.id,
+              tierListId: listId,
+              containerType: "pool",
+              tierRowId: null,
+              sortOrder: startOrder + index
+            });
+            syncItemSearch(item);
+            return item;
+          });
+        });
+        return imported().map(mapItem);
       },
       update: (itemId: string, patch: ItemUpdateInput) => {
         const updated = db.transaction(() => {
@@ -428,6 +485,49 @@ const rewriteRows = (rows: RowRepository, listId: string, currentRows: TierRowRe
   currentRows.forEach((row, index) => {
     rows.update(row.id, { sortOrder: offset + index });
   });
+};
+
+const mimeTypesByExtension: Record<string, string> = {
+  gif: "image/gif",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  m4v: "video/x-m4v",
+  mov: "video/quicktime",
+  mp4: "video/mp4",
+  png: "image/png",
+  webm: "video/webm",
+  webp: "image/webp"
+};
+
+const imageExtensions = new Set(["gif", "jpeg", "jpg", "png", "webp"]);
+const videoExtensions = new Set(["m4v", "mov", "mp4", "webm"]);
+
+const inspectMediaFile = (filePath: string) => {
+  const extension = extname(filePath).replace(".", "").toLowerCase();
+  const kind: "image" | "video" | undefined = imageExtensions.has(extension)
+    ? "image"
+    : videoExtensions.has(extension)
+      ? "video"
+      : undefined;
+  if (!kind) {
+    throw new Error(`Unsupported media file type: ${filePath}`);
+  }
+
+  const bytes = readFileSync(filePath);
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  const originalName = basename(filePath);
+  const label = basename(filePath, extname(filePath)).trim() || originalName;
+
+  return {
+    kind,
+    sha256,
+    originalName,
+    label,
+    extension,
+    byteSize: statSync(filePath).size,
+    mimeType: mimeTypesByExtension[extension] ?? `${kind}/${extension}`,
+    managedRelPath: join("assets", `${sha256}.${extension}`)
+  };
 };
 
 const escapeFtsQuery = (query: string) => `"${query.replace(/"/g, "\"\"")}"`;

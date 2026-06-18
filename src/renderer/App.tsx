@@ -137,6 +137,7 @@ export const App = () => {
   const [activeThemeIndex, setActiveThemeIndex] = useState(saved?.activeThemeIndex ?? 0);
   const [providers, setProviders] = useState<ProviderState[]>(saved?.providers ?? defaultProviders);
   const [effects, setEffects] = useState(saved?.effects ?? { glow: true, shake: false, confetti: false });
+  const [isAddItemsOpen, setIsAddItemsOpen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(
@@ -237,16 +238,13 @@ export const App = () => {
     }
   };
 
-  const addPoolItem = () => {
-    const label = window.prompt("Item name");
-    if (!label?.trim()) {
+  const refreshActiveBoard = async () => {
+    if (!board.id) {
       return;
     }
 
-    setBoard((current) => ({
-      ...current,
-      items: [...current.items, { id: crypto.randomUUID(), label: label.trim(), container: "pool" }]
-    }));
+    setBoard(await loadBoard(board.id));
+    setSelectedItemId(null);
   };
 
   const toggleProvider = (name: string) => {
@@ -329,7 +327,10 @@ export const App = () => {
         onSetScreen={setScreen}
         onSetMode={setMode}
         onExportPresentation={exportPresentation}
-        onAddPoolItem={addPoolItem}
+        onOpenAddItems={() => setIsAddItemsOpen(true)}
+        onCloseAddItems={() => setIsAddItemsOpen(false)}
+        onItemsAdded={refreshActiveBoard}
+        isAddItemsOpen={isAddItemsOpen}
         onDuplicateBoard={duplicateBoard}
         onCreateTemplate={createTemplateFromBoard}
         onResetBoard={resetBoard}

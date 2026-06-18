@@ -1,5 +1,6 @@
 import type { DragEvent } from "react";
 
+import { AddItemsModal } from "../components/AddItemsModal";
 import { BottomRail } from "../components/BottomRail";
 import { ItemDock } from "../components/ItemDock";
 import { PresentationSurface } from "../components/PresentationSurface";
@@ -47,7 +48,10 @@ type EditorPageProps = {
   onSetScreen: (screen: EditorScreen) => void;
   onSetMode: (mode: EditorMode) => void;
   onExportPresentation: () => void;
-  onAddPoolItem: () => void;
+  onOpenAddItems: () => void;
+  onCloseAddItems: () => void;
+  onItemsAdded: () => Promise<void>;
+  isAddItemsOpen: boolean;
   onDuplicateBoard: () => void;
   onCreateTemplate: () => void;
   onResetBoard: (template: Template) => void;
@@ -77,7 +81,10 @@ export const EditorPage = ({
   onSetScreen,
   onSetMode,
   onExportPresentation,
-  onAddPoolItem,
+  onOpenAddItems,
+  onCloseAddItems,
+  onItemsAdded,
+  isAddItemsOpen,
   onDuplicateBoard,
   onCreateTemplate,
   onResetBoard,
@@ -140,8 +147,8 @@ export const EditorPage = ({
           </button>
           {screen === "board" ? (
             <>
-              <button className="icon-button" aria-label="New item" onClick={onAddPoolItem}>
-                +
+              <button className="primary" onClick={onOpenAddItems} disabled={!board.id}>
+                Add Items
               </button>
               <button className="primary" onClick={onDuplicateBoard}>
                 Duplicate
@@ -197,6 +204,9 @@ export const EditorPage = ({
             onSetActiveThemeIndex={onSetActiveThemeIndex}
             onToggleEffect={onToggleEffect}
           />
+          {isAddItemsOpen && board.id ? (
+            <AddItemsModal listId={board.id} onClose={onCloseAddItems} onItemsAdded={onItemsAdded} />
+          ) : null}
         </>
       ) : (
         <section className="settings-page">
