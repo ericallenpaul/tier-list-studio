@@ -13,6 +13,8 @@ const createBoard = async (page: Page, name: string) => {
   await expect(page.getByRole("heading", { name })).toBeVisible();
 };
 
+const tierLabels = (page: Page) => page.locator(".tier-row .tier-label > span");
+
 test.describe("board editing", () => {
   let app: ElectronApplication | undefined;
   let page: Page;
@@ -51,6 +53,18 @@ test.describe("board editing", () => {
     await page.getByLabel("Row color").fill("#ff00aa");
     await page.getByRole("button", { name: "Save row" }).click();
     await expect(page.getByText("Top")).toBeVisible();
+    await expect(page.locator(".tier-label").filter({ hasText: "Top" })).toHaveCSS("background-color", "rgb(255, 0, 170)");
+    await expect(tierLabels(page)).toHaveText(["Top", "A", "B", "C", "D"]);
+
+    await page.getByRole("button", { name: "Add row after Top" }).click();
+    await expect(tierLabels(page)).toHaveText(["Top", "New", "A", "B", "C", "D"]);
+
+    await page.getByRole("button", { name: "Move row New up" }).click();
+    await expect(tierLabels(page)).toHaveText(["New", "Top", "A", "B", "C", "D"]);
+
+    await page.getByRole("button", { name: "Delete row Top" }).click();
+    await expect(tierLabels(page)).toHaveText(["New", "A", "B", "C", "D"]);
+    await expect(page.getByRole("button", { name: "Delete row Top" })).toHaveCount(0);
   });
 
   test("persists item movement after reload", async () => {
