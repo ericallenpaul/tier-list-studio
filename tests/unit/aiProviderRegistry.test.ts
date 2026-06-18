@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createAiProviderRegistry } from "../../src/main/services/ai/providerRegistry";
+import { createAiProviderRegistry, createDefaultAiProviderRegistry } from "../../src/main/services/ai/providerRegistry";
 import { localAiItemProvider } from "../../src/main/services/ai/localProvider";
 
 describe("ai provider registry", () => {
@@ -13,7 +13,8 @@ describe("ai provider registry", () => {
       {
         id: "local",
         label: "Local",
-        configured: true
+        configured: true,
+        enabled: true
       }
     ]);
   });
@@ -44,6 +45,7 @@ describe("ai provider registry", () => {
         id: "external",
         label: "External",
         configured: false,
+        enabled: true,
         generateItems: async () => ({ items: [] })
       }]
     });
@@ -59,5 +61,24 @@ describe("ai provider registry", () => {
       prompt: "Ideas",
       count: 5
     })).rejects.toThrow(/not configured/);
+  });
+
+  it("keeps OpenAI disabled even when a saved key is configured", async () => {
+    const registry = createDefaultAiProviderRegistry({
+      openAiApiKeyConfigured: true
+    });
+
+    expect(registry.listProviders()).toContainEqual({
+      id: "openai",
+      label: "OpenAI",
+      configured: true,
+      enabled: false
+    });
+
+    await expect(registry.generateItems({
+      providerId: "openai",
+      prompt: "Ideas",
+      count: 5
+    })).rejects.toThrow(/not available/);
   });
 });

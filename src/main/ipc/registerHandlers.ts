@@ -313,6 +313,7 @@ export const registerHandlers = (
       id: provider.id,
       name: provider.label,
       configured: provider.configured,
+      enabled: provider.enabled,
       capabilities: ["generate-items" as const]
     }));
   });

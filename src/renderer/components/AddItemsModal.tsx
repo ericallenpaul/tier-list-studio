@@ -48,6 +48,10 @@ export const AddItemsModal = ({ listId, onClose, onItemsAdded }: AddItemsModalPr
     () => generatedItems.filter((_, index) => selectedGeneratedIndexes.has(index)),
     [generatedItems, selectedGeneratedIndexes]
   );
+  const selectedProvider = useMemo(
+    () => providers.find((provider) => provider.id === selectedProviderId),
+    [providers, selectedProviderId]
+  );
 
   useEffect(() => {
     if (mode !== "search") {
@@ -101,8 +105,8 @@ export const AddItemsModal = ({ listId, onClose, onItemsAdded }: AddItemsModalPr
       }
       setProviders(availableProviders);
       const localProvider = availableProviders.find((provider) => provider.id === "local");
-      const firstConfiguredProvider = availableProviders.find((provider) => provider.configured);
-      setSelectedProviderId((localProvider ?? firstConfiguredProvider ?? availableProviders[0])?.id ?? "local");
+      const firstEnabledProvider = availableProviders.find((provider) => provider.enabled);
+      setSelectedProviderId((localProvider?.enabled ? localProvider : firstEnabledProvider ?? availableProviders[0])?.id ?? "local");
     }).catch((caught) => {
       if (!canceled) {
         setError(caught instanceof Error ? caught.message : "Could not load AI providers.");
@@ -319,8 +323,8 @@ export const AddItemsModal = ({ listId, onClose, onItemsAdded }: AddItemsModalPr
             >
               {providers.length === 0 ? <option value="local">Local</option> : null}
               {providers.map((provider) => (
-                <option key={provider.id} value={provider.id} disabled={!provider.configured}>
-                  {provider.name}{provider.configured ? "" : " (not configured)"}
+                <option key={provider.id} value={provider.id} disabled={!provider.enabled}>
+                  {provider.name}{provider.enabled ? "" : provider.configured ? " (not available)" : " (not configured)"}
                 </option>
               ))}
             </select>
@@ -338,7 +342,7 @@ export const AddItemsModal = ({ listId, onClose, onItemsAdded }: AddItemsModalPr
               <button className="pill-button" onClick={onClose}>
                 Cancel
               </button>
-              <button className="primary" disabled={isGenerating || !prompt.trim()} onClick={generateItems}>
+              <button className="primary" disabled={isGenerating || !prompt.trim() || !selectedProvider?.enabled} onClick={generateItems}>
                 {isGenerating ? "Generating" : "Generate"}
               </button>
             </div>

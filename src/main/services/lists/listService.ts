@@ -653,11 +653,7 @@ const isSupportedMediaSignature = (extension: string, header: Buffer) => {
 };
 
 const escapeFtsQuery = (query: string) => {
-  const tokens = query
-    .trim()
-    .split(/\s+/)
-    .map((token) => token.replace(/[^A-Za-z0-9_-]/g, ""))
-    .filter(Boolean);
+  const tokens = query.normalize("NFKC").match(/[\p{L}\p{N}]+/gu) ?? [];
 
-  return tokens.length > 0 ? tokens.map((token) => `${token}*`).join(" ") : "__tier_list_studio_no_match__";
+  return tokens.length > 0 ? tokens.map((token) => `"${token}"*`).join(" ") : "__tier_list_studio_no_match__";
 };

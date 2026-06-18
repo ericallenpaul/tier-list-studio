@@ -6,10 +6,11 @@ export type AiItemProvider = {
   id: string;
   label: string;
   configured: boolean;
+  enabled: boolean;
   generateItems: (input: AiGenerateItemsInput) => Promise<GeneratedItemsResult>;
 };
 
-type ProviderSummary = Pick<AiItemProvider, "id" | "label" | "configured">;
+type ProviderSummary = Pick<AiItemProvider, "id" | "label" | "configured" | "enabled">;
 
 type ProviderRegistryOptions = {
   providers: AiItemProvider[];
@@ -19,12 +20,16 @@ export const createAiProviderRegistry = ({ providers }: ProviderRegistryOptions)
   const providerMap = new Map(providers.map((provider) => [provider.id, provider]));
 
   const listProviders = (): ProviderSummary[] =>
-    providers.map(({ id, label, configured }) => ({ id, label, configured }));
+    providers.map(({ id, label, configured, enabled }) => ({ id, label, configured, enabled }));
 
   const generateItems = async (input: AiGenerateItemsInput) => {
     const provider = providerMap.get(input.providerId);
     if (!provider) {
       throw new Error(`Unknown AI provider: ${input.providerId}`);
+    }
+
+    if (!provider.enabled) {
+      throw new Error(`${provider.label} is not available.`);
     }
 
     if (!provider.configured) {
@@ -44,6 +49,7 @@ const createOpenAiPlaceholderProvider = (configured: boolean): AiItemProvider =>
   id: "openai",
   label: "OpenAI",
   configured,
+  enabled: false,
   generateItems: async () => {
     throw new Error("OpenAI item generation is disabled until an external provider implementation is added.");
   }

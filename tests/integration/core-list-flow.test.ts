@@ -149,6 +149,20 @@ describe("core list services and IPC", () => {
     expect(reopenedPositions.filter((position) => position.rowId === null).map((position) => position.itemId)).toEqual([items[2].id]);
   });
 
+  it("searches punctuation and hyphenated item labels without FTS syntax errors", () => {
+    const workspace = services.workspaces.create({ name: "Search" });
+    const list = services.lists.create({
+      workspaceId: workspace.id,
+      name: "Punctuation Search"
+    });
+    services.items.addTextBatch(list.id, ["Pizza-1", "foo-bar", "Plain Toast"]);
+
+    expect(services.items.search({ text: "Pizza-1", listId: list.id }).map((item) => item.label)).toEqual(["Pizza-1"]);
+    expect(services.items.search({ text: "foo-bar", listId: list.id }).map((item) => item.label)).toEqual(["foo-bar"]);
+    expect(services.items.search({ text: "foo-", listId: list.id }).map((item) => item.label)).toEqual(["foo-bar"]);
+    expect(services.items.search({ text: "!!!", listId: list.id })).toEqual([]);
+  });
+
   it("rejects ungranted IPC asset imports before reaching core services", async () => {
     const ipcMain = new FakeIpcMain();
     const paths: AppPaths = {

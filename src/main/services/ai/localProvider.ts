@@ -7,6 +7,7 @@ export const localAiItemProvider: AiItemProvider = {
   id: "local",
   label: "Local",
   configured: true,
+  enabled: true,
   generateItems: async (input) => {
     const prompt = input.prompt.toLowerCase();
     const sourceItems = /\bbreakfast\b/.test(prompt) ? breakfastItems : fallbackItems;

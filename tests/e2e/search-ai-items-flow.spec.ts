@@ -22,6 +22,9 @@ const createBoardWithItems = async (page: Page, name: string, items: string[]) =
   await expect(page.getByTestId("item-dock")).toContainText(items[0]);
 };
 
+const dockLabel = (page: Page, label: string) =>
+  page.getByTestId("item-dock").getByRole("button", { name: label, exact: true });
+
 test.describe("search and AI item generation", () => {
   let app: ElectronApplication | undefined;
   let page: Page;
@@ -53,15 +56,41 @@ test.describe("search and AI item generation", () => {
     app = undefined;
   });
 
-  test("searches existing items and generates local AI suggestions", async () => {
+  test("reviews selected search results and local AI suggestions before adding them", async () => {
     await createBoardWithItems(page, "AI", ["Pizza", "Pasta"]);
     await page.getByRole("button", { name: "Add Items" }).click();
     await page.getByRole("tab", { name: "Search" }).click();
-    await page.getByPlaceholder("Search library").fill("Piz");
+    await page.getByPlaceholder("Search library").fill("P");
     await expect(page.getByText("Pizza")).toBeVisible();
+    await expect(page.getByText("Pasta")).toBeVisible();
+
+    const searchDialog = page.getByRole("dialog", { name: "Add content" });
+    const pastaSearchCheckbox = searchDialog.getByRole("checkbox", { name: "Pasta" });
+    await pastaSearchCheckbox.uncheck();
+    await expect(pastaSearchCheckbox).not.toBeChecked();
+    await pastaSearchCheckbox.check();
+    await expect(pastaSearchCheckbox).toBeChecked();
+    await pastaSearchCheckbox.uncheck();
+    await searchDialog.getByRole("button", { name: "Add 1 Item" }).click();
+    await expect(dockLabel(page, "Pizza")).toHaveCount(2);
+    await expect(dockLabel(page, "Pasta")).toHaveCount(1);
+
+    await page.getByRole("button", { name: "Add Items" }).click();
     await page.getByRole("tab", { name: "AI" }).click();
     await page.getByLabel("Prompt").fill("Generate five breakfast foods");
     await page.getByRole("button", { name: "Generate" }).click();
     await expect(page.getByTestId("generated-items")).toContainText("Pancakes");
+
+    const aiDialog = page.getByRole("dialog", { name: "Add content" });
+    const wafflesCheckbox = aiDialog.getByRole("checkbox", { name: "Waffles" });
+    await wafflesCheckbox.uncheck();
+    await expect(wafflesCheckbox).not.toBeChecked();
+    await wafflesCheckbox.check();
+    await expect(wafflesCheckbox).toBeChecked();
+    await wafflesCheckbox.uncheck();
+    await aiDialog.getByRole("button", { name: "Add 4 Items" }).click();
+    await expect(dockLabel(page, "Pancakes")).toHaveCount(1);
+    await expect(dockLabel(page, "Waffles")).toHaveCount(0);
+    await expect(dockLabel(page, "Omelet")).toHaveCount(1);
   });
 });

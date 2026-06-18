@@ -122,5 +122,6 @@ export interface AiProvider {
   id: EntityId;
   name: string;
   configured: boolean;
+  enabled: boolean;
   capabilities: Array<"generate-items">;
 }
