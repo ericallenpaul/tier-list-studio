@@ -675,6 +675,13 @@ button {
   opacity: 0.45;
 }
 
+.dock-bulk-status {
+  margin: 0;
+  color: #fecaca;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
 .dock-list {
   display: grid;
   gap: 8px;

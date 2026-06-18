@@ -49,7 +49,10 @@ export const ItemDock = ({
 }: ItemDockProps) => {
   const [filter, setFilter] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("label");
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
   const selectedIds = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
+  const selectedItems = useMemo(() => items.filter((item) => selectedIds.has(item.id)), [items, selectedIds]);
   const filteredItems = useMemo(() => {
     const cleanFilter = filter.trim().toLowerCase();
     return [...items]
@@ -65,6 +68,31 @@ export const ItemDock = ({
       });
   }, [filter, items, sortMode]);
   const selectedCount = selectedItemIds.length;
+  const hasSelectedNonText = selectedItems.some((item) => item.kind !== "text");
+  const hasSelectedPlacedItem = selectedItems.some((item) => item.container !== "pool");
+  const isBulkBusy = busyAction !== null;
+  const sendToPoolDisabled = selectedCount === 0 || isBulkBusy || !hasSelectedPlacedItem;
+  const duplicateDisabled = selectedCount === 0 || isBulkBusy || hasSelectedNonText;
+  const deleteDisabled = selectedCount === 0 || isBulkBusy;
+  const duplicateStatus = selectedCount > 0 && hasSelectedNonText ? "Duplicate is available for text items only." : null;
+  const poolStatus = selectedCount > 0 && !hasSelectedPlacedItem ? "Send to pool applies to placed items." : null;
+  const bulkStatus = bulkError ?? duplicateStatus ?? poolStatus;
+
+  const runBulkAction = async (label: string, action?: () => Promise<void> | void) => {
+    if (!action) {
+      return;
+    }
+
+    setBulkError(null);
+    setBusyAction(label);
+    try {
+      await action();
+    } catch (caught) {
+      setBulkError(caught instanceof Error ? caught.message : `Could not ${label.toLowerCase()}.`);
+    } finally {
+      setBusyAction(null);
+    }
+  };
 
   return (
     <section
@@ -99,16 +127,34 @@ export const ItemDock = ({
             </select>
           </label>
           <div className="dock-bulk-actions" aria-label="Bulk item actions">
-            <button className="pill-button" type="button" disabled={selectedCount === 0} onClick={() => void onSendSelectedToPool?.()}>
-              Send to pool
+            <button
+              className="pill-button"
+              type="button"
+              disabled={sendToPoolDisabled}
+              onClick={() => void runBulkAction("Send to pool", onSendSelectedToPool)}
+              title={poolStatus ?? undefined}
+            >
+              {busyAction === "Send to pool" ? "Sending" : "Send to pool"}
             </button>
-            <button className="pill-button" type="button" disabled={selectedCount === 0} onClick={() => void onDuplicateSelected?.()}>
-              Duplicate
+            <button
+              className="pill-button"
+              type="button"
+              disabled={duplicateDisabled}
+              onClick={() => void runBulkAction("Duplicate", onDuplicateSelected)}
+              title={duplicateStatus ?? undefined}
+            >
+              {busyAction === "Duplicate" ? "Duplicating" : "Duplicate"}
             </button>
-            <button className="pill-button" type="button" disabled={selectedCount === 0} onClick={() => void onDeleteSelected?.()}>
-              Delete
+            <button
+              className="pill-button"
+              type="button"
+              disabled={deleteDisabled}
+              onClick={() => void runBulkAction("Delete", onDeleteSelected)}
+            >
+              {busyAction === "Delete" ? "Deleting" : "Delete"}
             </button>
           </div>
+          {bulkStatus ? <p className="dock-bulk-status" role="status" aria-live="polite">{bulkStatus}</p> : null}
         </div>
       ) : null}
 

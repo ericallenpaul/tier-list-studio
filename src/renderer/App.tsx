@@ -296,7 +296,9 @@ export const App = () => {
       .filter((item): item is EditorBoardItem => Boolean(item));
 
   const sendCheckedToPool = async () => {
-    const itemIds = checkedItems().map((item) => item.id);
+    const itemIds = checkedItems()
+      .filter((item) => item.container !== "pool")
+      .map((item) => item.id);
     if (itemIds.length === 0) {
       return;
     }
@@ -320,6 +322,9 @@ export const App = () => {
     const items = checkedItems();
     if (items.length === 0) {
       return;
+    }
+    if (items.some((item) => item.kind !== "text")) {
+      throw new Error("Duplicate is available for text items only.");
     }
     const copyLabels = items.map((item) => `${item.label} Copy`);
 
@@ -372,7 +377,6 @@ export const App = () => {
     if (board.id) {
       await editorStore.updateItem(itemId, patch);
       setBoard(await loadBoard(board.id));
-      setSelectedItemId(null);
       return;
     }
 
@@ -384,7 +388,6 @@ export const App = () => {
           : item
       )
     }));
-    setSelectedItemId(null);
   };
 
   const insertRow = async (afterRowId?: string) => {
