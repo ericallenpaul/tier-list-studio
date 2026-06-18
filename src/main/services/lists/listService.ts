@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { constants, createReadStream } from "node:fs";
-import { copyFile, mkdir, open, stat } from "node:fs/promises";
+import { copyFile, mkdir, open, rename, stat, unlink } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 
 import type { TierStudioServices } from "../../../shared/contracts/tierStudioApi.js";
@@ -337,9 +337,10 @@ export const createCoreListServices = (db: SqliteDatabase, options: CoreListServ
           throw new Error(`Tier list not found: ${listId}`);
         }
 
-        const mediaFiles = await Promise.all(filePaths.map((filePath) => inspectMediaFile(filePath)));
-        await mkdir(join(userDataPath, "assets"), { recursive: true });
-        await Promise.all(mediaFiles.map((media) => copyManagedAsset(media.sourcePath, join(userDataPath, media.managedRelPath))));
+        const mediaFiles: InspectedMediaFile[] = [];
+        for (const filePath of filePaths) {
+          mediaFiles.push(await stageManagedAsset(filePath, userDataPath));
+        }
 
         const imported = db.transaction(() => {
           const startOrder = maxSortOrder(db, listId, null) + 1;
@@ -520,28 +521,28 @@ type InspectedMediaFile = {
   sourcePath: string;
 };
 
-const inspectMediaFile = async (filePath: string): Promise<InspectedMediaFile> => {
-  const extension = extname(filePath).replace(".", "").toLowerCase();
+const inspectMediaFile = async (copiedPath: string, originalPath = copiedPath): Promise<InspectedMediaFile> => {
+  const extension = extname(originalPath).replace(".", "").toLowerCase();
   const kind: "image" | "video" | undefined = imageExtensions.has(extension)
     ? "image"
     : videoExtensions.has(extension)
       ? "video"
       : undefined;
   if (!kind) {
-    throw new Error(`Unsupported media file type: ${filePath}`);
+    throw new Error(`Unsupported media file type: ${originalPath}`);
   }
 
   const [fileStat, header, sha256] = await Promise.all([
-    stat(filePath),
-    readHeader(filePath),
-    hashFile(filePath)
+    stat(copiedPath),
+    readHeader(copiedPath),
+    hashFile(copiedPath)
   ]);
   if (!isSupportedMediaSignature(extension, header)) {
-    throw new Error(`Unsupported or invalid media file content: ${filePath}`);
+    throw new Error(`Unsupported or invalid media file content: ${originalPath}`);
   }
 
-  const originalName = basename(filePath);
-  const label = basename(filePath, extname(filePath)).trim() || originalName;
+  const originalName = basename(originalPath);
+  const label = basename(originalPath, extname(originalPath)).trim() || originalName;
 
   return {
     kind,
@@ -552,8 +553,40 @@ const inspectMediaFile = async (filePath: string): Promise<InspectedMediaFile> =
     byteSize: fileStat.size,
     mimeType: mimeTypesByExtension[extension] ?? `${kind}/${extension}`,
     managedRelPath: join("assets", `${sha256}.${extension}`),
-    sourcePath: filePath
+    sourcePath: originalPath
   };
+};
+
+const stageManagedAsset = async (sourcePath: string, userDataPath: string) => {
+  const assetsDir = join(userDataPath, "assets");
+  await mkdir(assetsDir, { recursive: true });
+
+  const tempPath = join(assetsDir, `.import-${randomUUID()}.tmp`);
+  let shouldCleanTemp = true;
+  try {
+    await copyManagedAsset(sourcePath, tempPath);
+    const media = await inspectMediaFile(tempPath, sourcePath);
+    const managedPath = join(userDataPath, media.managedRelPath);
+
+    try {
+      await rename(tempPath, managedPath);
+      shouldCleanTemp = false;
+    } catch (caught) {
+      const code = (caught as NodeJS.ErrnoException).code;
+      if (code !== "EEXIST" && code !== "EPERM") {
+        throw caught;
+      }
+      await verifyManagedAsset(managedPath, media.sha256, media.byteSize);
+      await unlink(tempPath);
+      shouldCleanTemp = false;
+    }
+
+    return media;
+  } finally {
+    if (shouldCleanTemp) {
+      await unlinkIfExists(tempPath);
+    }
+  }
 };
 
 const readHeader = async (filePath: string, length = 64) => {
@@ -577,10 +610,21 @@ const hashFile = (filePath: string) =>
   });
 
 const copyManagedAsset = async (sourcePath: string, managedPath: string) => {
+  await copyFile(sourcePath, managedPath, constants.COPYFILE_EXCL);
+};
+
+const verifyManagedAsset = async (managedPath: string, sha256: string, byteSize: number) => {
+  const [fileStat, actualSha256] = await Promise.all([stat(managedPath), hashFile(managedPath)]);
+  if (fileStat.size !== byteSize || actualSha256 !== sha256) {
+    throw new Error(`Managed asset content does not match expected hash: ${managedPath}`);
+  }
+};
+
+const unlinkIfExists = async (filePath: string) => {
   try {
-    await copyFile(sourcePath, managedPath, constants.COPYFILE_EXCL);
+    await unlink(filePath);
   } catch (caught) {
-    if ((caught as NodeJS.ErrnoException).code !== "EEXIST") {
+    if ((caught as NodeJS.ErrnoException).code !== "ENOENT") {
       throw caught;
     }
   }

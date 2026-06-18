@@ -68,12 +68,14 @@ describe("asset import", () => {
   });
 
   it("reuses one asset record for duplicate file imports while creating ordered items", async () => {
-    const imagePath = join(tempDir, "duplicate pizza.png");
-    writeFileSync(imagePath, pngBytes);
+    const firstImagePath = join(tempDir, "duplicate pizza.png");
+    const secondImagePath = join(tempDir, "same bytes pizza.png");
+    writeFileSync(firstImagePath, pngBytes);
+    writeFileSync(secondImagePath, pngBytes);
 
     const workspace = services.workspaces.create({ name: "Rankings" });
     const list = services.lists.create({ workspaceId: workspace.id, name: "Duplicate Media" });
-    const imported = await services.items.importAssets(list.id, [imagePath, imagePath]);
+    const imported = await services.items.importAssets(list.id, [firstImagePath, secondImagePath]);
 
     expect(imported).toHaveLength(2);
     expect(imported[0].assetId).toBe(imported[1].assetId);

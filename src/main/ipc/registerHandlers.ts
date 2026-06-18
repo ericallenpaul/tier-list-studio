@@ -117,28 +117,83 @@ const dialogGrantTtlMs = 5 * 60 * 1000;
 
 const normalizeGrantedPath = (filePath: string) => resolve(filePath);
 
-const grantDialogFilePaths = (grantedFilePaths: Set<string>, filePaths: string[]) => {
+type DialogGrantTimeout = ReturnType<typeof setTimeout>;
+type DialogGrantScope = Map<string, DialogGrantTimeout>;
+type DialogGrantStore = Map<string, DialogGrantScope>;
+
+const fallbackSenderKeys = new WeakMap<object, string>();
+let fallbackSenderKeyCounter = 0;
+
+const getDialogGrantScopeKey = (event: unknown) => {
+  const sender = (event as { sender?: unknown } | undefined)?.sender;
+  if (sender && typeof sender === "object") {
+    const senderId = (sender as { id?: unknown }).id;
+    if (typeof senderId === "number" || typeof senderId === "string") {
+      return `webContents:${senderId}`;
+    }
+
+    const existingKey = fallbackSenderKeys.get(sender);
+    if (existingKey) {
+      return existingKey;
+    }
+
+    fallbackSenderKeyCounter += 1;
+    const fallbackKey = `testSender:${fallbackSenderKeyCounter}`;
+    fallbackSenderKeys.set(sender, fallbackKey);
+    return fallbackKey;
+  }
+
+  return `testSender:${String(sender ?? "unknown")}`;
+};
+
+const grantDialogFilePaths = (grantedFilePaths: DialogGrantStore, scopeKey: string, filePaths: string[]) => {
+  let scopedGrants = grantedFilePaths.get(scopeKey);
+  if (!scopedGrants) {
+    scopedGrants = new Map();
+    grantedFilePaths.set(scopeKey, scopedGrants);
+  }
+
   for (const filePath of filePaths) {
     const normalized = normalizeGrantedPath(filePath);
-    grantedFilePaths.add(normalized);
-    const timeout = setTimeout(() => grantedFilePaths.delete(normalized), dialogGrantTtlMs);
+    const existingTimeout = scopedGrants.get(normalized);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+    }
+
+    const timeout = setTimeout(() => {
+      scopedGrants.delete(normalized);
+      if (scopedGrants.size === 0) {
+        grantedFilePaths.delete(scopeKey);
+      }
+    }, dialogGrantTtlMs);
     if (typeof timeout === "object" && "unref" in timeout) {
       timeout.unref();
     }
+    scopedGrants.set(normalized, timeout);
   }
 };
 
-const consumeDialogFilePathGrants = (grantedFilePaths: Set<string>, filePaths: string[]) => {
+const consumeDialogFilePathGrants = (grantedFilePaths: DialogGrantStore, scopeKey: string, filePaths: string[]) => {
   const normalizedPaths = filePaths.map(normalizeGrantedPath);
   const uniquePaths = new Set(normalizedPaths);
   if (uniquePaths.size !== normalizedPaths.length) {
     throw new Error("Import file paths must be unique.");
   }
-  const ungrantedPath = normalizedPaths.find((filePath) => !grantedFilePaths.has(filePath));
+  const scopedGrants = grantedFilePaths.get(scopeKey);
+  const ungrantedPath = normalizedPaths.find((filePath) => !scopedGrants?.has(filePath));
   if (ungrantedPath) {
     throw new Error(`Import file path was not selected through the file picker: ${ungrantedPath}`);
   }
-  normalizedPaths.forEach((filePath) => grantedFilePaths.delete(filePath));
+  normalizedPaths.forEach((filePath) => {
+    const timeout = scopedGrants?.get(filePath);
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    scopedGrants?.delete(filePath);
+  });
+  if (scopedGrants?.size === 0) {
+    grantedFilePaths.delete(scopeKey);
+  }
 
   return normalizedPaths;
 };
@@ -149,7 +204,7 @@ export const registerHandlers = (
   options: RegisterHandlerOptions = {}
 ) => {
   const coreServices = () => (options.services as CoreListServices | undefined) ?? getProductionCoreServices(app);
-  const grantedFilePaths = new Set<string>();
+  const grantedFilePaths: DialogGrantStore = new Map();
 
   registerValidatedHandler(ipcMain, tierStudioChannels.app.getVersion, voidPayloadSchema, () => app.getVersion());
   registerValidatedHandler(ipcMain, tierStudioChannels.app.getPaths, voidPayloadSchema, () => ({
@@ -158,7 +213,7 @@ export const registerHandlers = (
     temp: app.getPath("temp")
   }));
 
-  registerValidatedHandler(ipcMain, tierStudioChannels.dialogs.openFiles, openFilesInputSchema, async (input) => {
+  registerValidatedHandler(ipcMain, tierStudioChannels.dialogs.openFiles, openFilesInputSchema, async (input, event) => {
     const result = await dialog.showOpenDialog({
       title: input.title,
       defaultPath: input.defaultPath,
@@ -167,7 +222,7 @@ export const registerHandlers = (
     });
 
     if (!result.canceled) {
-      grantDialogFilePaths(grantedFilePaths, result.filePaths);
+      grantDialogFilePaths(grantedFilePaths, getDialogGrantScopeKey(event), result.filePaths);
     }
 
     return {
@@ -194,8 +249,8 @@ export const registerHandlers = (
   registerValidatedHandler(ipcMain, tierStudioChannels.rows.remove, rowIdPayloadSchema, ({ rowId }) => coreServices().rows.remove(rowId));
 
   registerValidatedHandler(ipcMain, tierStudioChannels.items.addTextBatch, addTextBatchPayloadSchema, ({ listId, lines }) => coreServices().items.addTextBatch(listId, lines));
-  registerValidatedHandler(ipcMain, tierStudioChannels.items.importAssets, importAssetsPayloadSchema, ({ listId, filePaths }) =>
-    coreServices().items.importAssets(listId, consumeDialogFilePathGrants(grantedFilePaths, filePaths)));
+  registerValidatedHandler(ipcMain, tierStudioChannels.items.importAssets, importAssetsPayloadSchema, ({ listId, filePaths }, event) =>
+    coreServices().items.importAssets(listId, consumeDialogFilePathGrants(grantedFilePaths, getDialogGrantScopeKey(event), filePaths)));
   registerValidatedHandler(ipcMain, tierStudioChannels.items.update, itemUpdatePayloadSchema, ({ itemId, patch }) => coreServices().items.update(itemId, patch));
   registerValidatedHandler(ipcMain, tierStudioChannels.items.remove, itemIdPayloadSchema, ({ itemId }) => coreServices().items.remove(itemId));
   registerValidatedHandler(ipcMain, tierStudioChannels.items.search, itemSearchInputSchema, (input) => coreServices().items.search(input));

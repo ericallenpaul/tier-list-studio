@@ -2,7 +2,15 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("electron", () => ({
+  dialog: {
+    showOpenDialog: vi.fn()
+  }
+}));
+
+import { dialog } from "electron";
 
 import { registerHandlers, type IpcMainLike } from "../../src/main/ipc/registerHandlers.js";
 import { closeDatabase, openDatabase, type SqliteDatabase } from "../../src/main/services/db/connection.js";
@@ -11,7 +19,7 @@ import { createCoreListServices } from "../../src/main/services/lists/listServic
 import { RowRepository } from "../../src/main/services/repositories/index.js";
 import { createTierStudioApi } from "../../src/preload/api.cjs";
 import { mapTierListToBoard } from "../../src/renderer/domain/editorMappers.js";
-import type { TierStudioChannel } from "../../src/preload/channelTypes.cjs";
+import { tierStudioChannels, type TierStudioChannel } from "../../src/preload/channelTypes.cjs";
 import type { AppPaths, TierStudioServices } from "../../src/shared/contracts/tierStudioApi.js";
 
 class FakeIpcMain implements IpcMainLike {
@@ -21,12 +29,12 @@ class FakeIpcMain implements IpcMainLike {
     this.handlers.set(channel, listener);
   }
 
-  invoke(channel: TierStudioChannel, payload?: unknown) {
+  invoke(channel: TierStudioChannel, payload?: unknown, event: unknown = { sender: "test" }) {
     const handler = this.handlers.get(channel);
     if (!handler) {
       throw new Error(`Missing handler: ${channel}`);
     }
-    return Promise.resolve(handler({ sender: "test" }, payload));
+    return Promise.resolve(handler(event, payload));
   }
 }
 
@@ -44,6 +52,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   if (db.open) {
     closeDatabase(db);
   }
@@ -159,5 +168,44 @@ describe("core list services and IPC", () => {
 
     await expect(Promise.resolve().then(() => api.items.importAssets("list-1", [join(tempDir, "unpicked.png")])))
       .rejects.toThrow(/file picker/i);
+  });
+
+  it("scopes dialog file grants to the sender that opened the picker", async () => {
+    const ipcMain = new FakeIpcMain();
+    const pickedPath = join(tempDir, "picked.png");
+    const importAssets = vi.fn(async () => []);
+    vi.spyOn(dialog, "showOpenDialog").mockResolvedValue({
+      canceled: false,
+      filePaths: [pickedPath]
+    });
+
+    registerHandlers(
+      ipcMain,
+      {
+        getVersion: () => "0.1.0-test",
+        getPath: () => tempDir
+      },
+      { services: { items: { importAssets } } as Partial<TierStudioServices> }
+    );
+
+    await ipcMain.invoke(
+      tierStudioChannels.dialogs.openFiles,
+      { multiple: false },
+      { sender: { id: 1 } }
+    );
+
+    await expect(Promise.resolve().then(() => ipcMain.invoke(
+      tierStudioChannels.items.importAssets,
+      { listId: "list-1", filePaths: [pickedPath] },
+      { sender: { id: 2 } }
+    ))).rejects.toThrow(/file picker/i);
+    expect(importAssets).not.toHaveBeenCalled();
+
+    await expect(ipcMain.invoke(
+      tierStudioChannels.items.importAssets,
+      { listId: "list-1", filePaths: [pickedPath] },
+      { sender: { id: 1 } }
+    )).resolves.toEqual([]);
+    expect(importAssets).toHaveBeenCalledWith("list-1", [pickedPath]);
   });
 });
