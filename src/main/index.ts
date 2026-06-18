@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, Menu } from "electron";
 
 import { registerHandlers } from "./ipc/registerHandlers.js";
 import { createMainWindow } from "./windows/createMainWindow.js";
@@ -6,6 +6,7 @@ import { createMainWindow } from "./windows/createMainWindow.js";
 registerHandlers(ipcMain, app);
 
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(null);
   createMainWindow();
 
   app.on("activate", () => {

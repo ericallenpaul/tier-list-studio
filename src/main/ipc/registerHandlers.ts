@@ -1,5 +1,6 @@
 import type { App } from "electron";
-import { join } from "node:path";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import type { ZodType } from "zod";
 
 import { tierStudioChannels, type TierStudioChannel } from "../../preload/channelTypes.cjs";
@@ -37,6 +38,7 @@ import { voidPayloadSchema } from "../../shared/schemas/common.js";
 import { openDatabase, type SqliteDatabase } from "../services/db/connection.js";
 import { runMigrations } from "../services/db/migrations.js";
 import { createCoreListServices, type CoreListServices } from "../services/lists/listService.js";
+import type { RenderImageInput } from "../../shared/models/api.js";
 
 export interface IpcMainLike {
   handle: (channel: string, listener: (event: unknown, payload?: unknown) => unknown) => void;
@@ -71,6 +73,40 @@ const getProductionCoreServices = (app: Pick<App, "getPath">) => {
   }
 
   return productionCoreServices;
+};
+
+const safeExportFileName = (input: RenderImageInput) => {
+  const fallback = `${input.listId}.${input.format}`;
+  const requested = input.fileName ?? fallback;
+  const sanitized = requested.replace(/[<>:"/\\|?*\u0000-\u001F]+/g, "-").replace(/^-+|-+$/g, "");
+  const withExtension = sanitized.toLowerCase().endsWith(`.${input.format}`) ? sanitized : `${sanitized}.${input.format}`;
+
+  return withExtension || fallback;
+};
+
+const imageDataUrlToBuffer = (dataUrl: string) => {
+  const match = /^data:image\/(?:png|jpeg|jpg|webp);base64,(?<data>.+)$/i.exec(dataUrl);
+  if (!match?.groups?.data) {
+    throw new Error("Export image data must be a base64 image data URL.");
+  }
+
+  return Buffer.from(match.groups.data, "base64");
+};
+
+const renderImageArtifact = async (app: Pick<App, "getPath">, input: RenderImageInput) => {
+  if (!input.imageDataUrl) {
+    throw new Error("Renderer image data is required for PNG export.");
+  }
+
+  const filePath = input.filePath ?? join(app.getPath("documents"), "Tier List Studio", "Exports", safeExportFileName(input));
+  await mkdir(dirname(filePath), { recursive: true });
+  await writeFile(filePath, imageDataUrlToBuffer(input.imageDataUrl));
+
+  return {
+    filePath,
+    format: input.format,
+    createdAt: new Date().toISOString()
+  };
 };
 
 type RegisterHandlerOptions = {
@@ -127,7 +163,7 @@ export const registerHandlers = (
   registerValidatedHandler(ipcMain, tierStudioChannels.snapshots.list, listIdPayloadSchema, notImplemented(tierStudioChannels.snapshots.list));
   registerValidatedHandler(ipcMain, tierStudioChannels.snapshots.restore, snapshotIdPayloadSchema, notImplemented(tierStudioChannels.snapshots.restore));
 
-  registerValidatedHandler(ipcMain, tierStudioChannels.exports.renderImage, renderImageInputSchema, notImplemented(tierStudioChannels.exports.renderImage));
+  registerValidatedHandler(ipcMain, tierStudioChannels.exports.renderImage, renderImageInputSchema, (input) => renderImageArtifact(app, input));
   registerValidatedHandler(ipcMain, tierStudioChannels.exports.exportPackage, listIdPayloadSchema, notImplemented(tierStudioChannels.exports.exportPackage));
   registerValidatedHandler(ipcMain, tierStudioChannels.exports.exportCsv, listIdPayloadSchema, notImplemented(tierStudioChannels.exports.exportCsv));
 

@@ -1,6 +1,6 @@
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -57,5 +57,43 @@ test.describe("secure Electron shell", () => {
       process: "undefined",
       require: "undefined"
     });
+  });
+
+  test("does not install a native application menu", async () => {
+    const hasMenu = await app?.evaluate(({ Menu }) => Menu.getApplicationMenu() !== null);
+
+    expect(hasMenu).toBe(false);
+  });
+
+  test("presentation mode hides editor controls but keeps the board draggable", async () => {
+    await page.getByRole("button", { name: "Presentation" }).click();
+
+    await expect(page.locator(".topbar")).toBeHidden();
+    await expect(page.getByRole("button", { name: "Export" })).toBeHidden();
+    await expect(page.getByRole("button", { name: "Duplicate" })).toBeHidden();
+    await expect(page.locator(".pool-strip")).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("button", { name: "Export" })).toBeVisible();
+  });
+
+  test("export writes a png artifact of the presentation surface", async () => {
+    const exportPromise = page.evaluate(() =>
+      new Promise<{ filePath: string; format: string }>((resolve) => {
+        window.addEventListener(
+          "tier-studio:export-complete",
+          (event) => resolve((event as CustomEvent<{ filePath: string; format: string }>).detail),
+          { once: true }
+        );
+      })
+    );
+
+    await page.getByRole("button", { name: "Export" }).click();
+
+    const artifact = await exportPromise;
+    expect(artifact.format).toBe("png");
+    expect(artifact.filePath).toMatch(/launch-week.*\.png$/i);
+    expect(existsSync(artifact.filePath)).toBe(true);
+    await expect(page.locator(".topbar")).toBeHidden();
   });
 });
