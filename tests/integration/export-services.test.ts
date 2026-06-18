@@ -111,9 +111,12 @@ describe("export services", () => {
         originalName: string;
         mimeType: string;
         managedRelPath: string;
+        sourcePath?: string;
         file: {
           kind: string;
           managedRelPath: string;
+          managedPath?: string;
+          sourcePath?: string;
           managedPathExists: boolean;
           sourcePathExists: boolean;
           encoding?: string;
@@ -146,6 +149,10 @@ describe("export services", () => {
       })
     ]);
     expect(packageData.assets[0].file.managedRelPath).toBe(packageData.assets[0].managedRelPath);
+    expect(packageData.assets[0].sourcePath).toBeUndefined();
+    expect(packageData.assets[0].file.managedPath).toBeUndefined();
+    expect(packageData.assets[0].file.sourcePath).toBeUndefined();
+    expect(JSON.stringify(packageData)).not.toContain(escapeJsonPath(tempDir));
   });
 
   it("writes local-reference package metadata when a managed asset file is missing", async () => {
@@ -412,3 +419,5 @@ const createPackageAssetRecord = (input: Pick<MediaAssetRecord, "id" | "original
   metadata: {},
   createdAt: input.createdAt
 });
+
+const escapeJsonPath = (filePath: string) => filePath.replace(/\\/g, "\\\\");

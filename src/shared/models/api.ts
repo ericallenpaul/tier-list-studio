@@ -56,6 +56,24 @@ export interface GeneratedItemsResult {
   items: Array<Pick<TierItem, "label" | "metadata">>;
 }
 
+export type ManagedAssetPreview =
+  | {
+      status: "available";
+      assetId: string;
+      kind: "image" | "video";
+      originalName: string;
+      mimeType: string;
+      dataUrl: string;
+    }
+  | {
+      status: "unavailable";
+      assetId: string;
+      kind: "image" | "video" | "file";
+      originalName?: string;
+      mimeType?: string;
+      reason: string;
+    };
+
 export type TierListDetail = TierList & {
   items?: TierItem[];
   rows?: TierRow[];
@@ -96,6 +114,9 @@ export interface TierStudioDomainResults {
     update: TierItem;
     remove: void;
     search: TierItem[];
+  };
+  assets: {
+    getMediaDataUrl: ManagedAssetPreview;
   };
   positions: {
     move: TierPosition[];

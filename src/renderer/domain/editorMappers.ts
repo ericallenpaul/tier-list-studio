@@ -39,6 +39,7 @@ export const mapTierListToBoard = (list: ListWithItems): EditorBoardState => {
         id: item.id,
         label: item.label,
         kind: item.kind,
+        assetId: item.assetId,
         container: position?.rowId ?? "pool",
         metadata: item.metadata,
         style: item.style,

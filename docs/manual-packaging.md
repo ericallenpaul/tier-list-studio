@@ -1,8 +1,10 @@
 # Manual Packaging Notes
 
-Tier List Studio currently supports local PNG, JPEG, CSV, and JSON package exports. The package export is a pragmatic rehydration artifact: it includes board data, row/item positions, referenced media asset records, and managed asset file data when the managed files are readable at export time. If a managed asset cannot be embedded, the package records the managed relative path, resolved local path when available, source path, and existence flags so a future importer can report or recover the missing artifact explicitly.
+Tier List Studio currently supports local PNG, JPEG, CSV, and JSON package exports. The package export is a pragmatic rehydration artifact: it includes board data, row/item positions, referenced media asset records, and managed asset file data when the managed files are readable at export time. If a managed asset cannot be embedded, the package records the managed relative path, existence flags, and non-sensitive reason text so a future importer can report or recover the missing artifact explicitly. Package exports intentionally omit absolute local source and managed file paths.
 
 Backup and restore are intentionally deferred for this release slice. The preload contract contains backup methods for the planned API surface, but the main-process handlers are not presented in the renderer UI and still fail fast. A backup implementation should be added only when it can capture both the SQLite database and managed assets under a consistent strategy that avoids copying a live database in an unsafe state.
+
+AI provider implementation is disabled in this release. If an OpenAI API key is entered in Settings, it is stored locally in SQLite as plaintext configuration; do not treat this release as having a credential vault.
 
 ## Local Build Check
 

@@ -18,6 +18,7 @@ export type EditorBoardItem = {
   id: string;
   label: string;
   kind: TierItemKind;
+  assetId?: string;
   container: EditorContainer;
   metadata: JsonRecord;
   style: JsonRecord;

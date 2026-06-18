@@ -35,6 +35,7 @@ import {
   workspaceUpdatePayloadSchema
 } from "../../shared/schemas/inputs.js";
 import { voidPayloadSchema } from "../../shared/schemas/common.js";
+import { createManagedAssetPreview } from "../services/assets/assetPreviewService.js";
 import { openDatabase, type SqliteDatabase } from "../services/db/connection.js";
 import { runMigrations } from "../services/db/migrations.js";
 import { createDefaultAiProviderRegistry } from "../services/ai/providerRegistry.js";
@@ -273,6 +274,18 @@ export const registerHandlers = (
   registerValidatedHandler(ipcMain, tierStudioChannels.items.update, itemUpdatePayloadSchema, ({ itemId, patch }) => coreServices().items.update(itemId, patch));
   registerValidatedHandler(ipcMain, tierStudioChannels.items.remove, itemIdPayloadSchema, ({ itemId }) => coreServices().items.remove(itemId));
   registerValidatedHandler(ipcMain, tierStudioChannels.items.search, itemSearchInputSchema, (input) => coreServices().items.search(input));
+
+  registerValidatedHandler(ipcMain, tierStudioChannels.assets.getMediaDataUrl, idPayloadSchema, ({ id }) => {
+    if (options.services?.assets?.getMediaDataUrl) {
+      return options.services.assets.getMediaDataUrl(id);
+    }
+
+    return createManagedAssetPreview({
+      assetId: id,
+      asset: new AssetRepository(database()).get(id),
+      userDataPath: app.getPath("userData")
+    });
+  });
 
   registerValidatedHandler(ipcMain, tierStudioChannels.positions.move, positionMoveInputSchema, (input) => coreServices().positions.move(input));
   registerValidatedHandler(ipcMain, tierStudioChannels.positions.normalize, listIdPayloadSchema, ({ listId }) => coreServices().positions.normalize(listId));

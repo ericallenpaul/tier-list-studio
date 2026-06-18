@@ -86,9 +86,7 @@ const safeFileBase = (value: string) =>
 type PackageAssetFile = {
   kind: "embedded" | "local-reference";
   managedRelPath: string;
-  managedPath?: string;
   managedPathExists: boolean;
-  sourcePath: string;
   sourcePathExists: boolean;
   byteSize: number;
   encoding?: "base64";
@@ -97,7 +95,6 @@ type PackageAssetFile = {
 };
 
 export type PackageAsset = Omit<MediaAssetRecord, "sourcePath"> & {
-  sourcePath: string;
   file: PackageAssetFile;
 };
 
@@ -149,8 +146,10 @@ const collectPackageAssets = async (
       totalEmbeddedAssetBytes += file.byteSize;
     }
 
+    const { sourcePath: _sourcePath, ...safeAsset } = asset;
+
     packageAssets.push({
-      ...asset,
+      ...safeAsset,
       file
     });
   }
@@ -170,9 +169,7 @@ const createAssetFileEntry = async (
   const managedPathExists = managedPathStatus.exists;
   const baseEntry = {
     managedRelPath: asset.managedRelPath,
-    managedPath,
     managedPathExists,
-    sourcePath: asset.sourcePath,
     sourcePathExists,
     byteSize: asset.byteSize
   };

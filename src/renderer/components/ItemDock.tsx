@@ -1,6 +1,7 @@
 import { useMemo, useState, type DragEvent } from "react";
 
 import type { EditorBoardItem, EditorContainer } from "../domain/editorTypes";
+import { ItemMediaPreview } from "./ItemMediaPreview";
 
 type ItemDockProps = {
   items: EditorBoardItem[];
@@ -177,11 +178,12 @@ export const ItemDock = ({
             <button
               className={`item-chip ${selectedItemId === item.id ? "selected" : ""}`}
               style={{ fontSize: itemFontSize(item.label) }}
+              aria-label={item.label}
               draggable
               onDragStart={(event) => onDragStart(event, item.id)}
               onClick={() => onSelectItem(item.id)}
             >
-              {item.label}
+              <ItemMediaPreview item={item} />
             </button>
             {showControls ? (
               <span className="dock-item-meta">{getContainerLabel(item.container)}</span>

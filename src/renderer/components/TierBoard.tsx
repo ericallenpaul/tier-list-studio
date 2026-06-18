@@ -18,6 +18,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 import type { EditorBoardState, EditorContainer, EditorBoardItem, EditorTier } from "../domain/editorTypes";
+import { ItemMediaPreview } from "./ItemMediaPreview";
 import { RowEditor } from "./RowEditor";
 
 type TierBoardProps = {
@@ -149,6 +150,7 @@ const SortableTierRow = ({
             key={item.id}
             className={`item-chip placed ${selectedItemId === item.id ? "selected" : ""}`}
             style={{ fontSize: itemFontSize(item.label) }}
+            aria-label={item.label}
             draggable
             onDragStart={(event) => onDragStart(event, item.id)}
             onClick={(event) => {
@@ -156,7 +158,7 @@ const SortableTierRow = ({
               onSelectItem(item.id);
             }}
           >
-            {item.label}
+            <ItemMediaPreview item={item} />
           </button>
         ))}
       </div>

@@ -57,6 +57,20 @@ const waitForPaint = () =>
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
   });
 
+const waitForMediaPreviews = async (surface: HTMLElement, timeoutMs = 4000) => {
+  const deadline = Date.now() + timeoutMs;
+  while (surface.querySelector("[data-media-status='loading']") && Date.now() < deadline) {
+    await waitForPaint();
+  }
+
+  const images = Array.from(surface.querySelectorAll("img.media-preview-image"));
+  await Promise.all(images.map((image) =>
+    image instanceof HTMLImageElement && image.decode
+      ? image.decode().catch(() => undefined)
+      : Promise.resolve()
+  ));
+};
+
 const toExportFileName = (name: string, extension: ImageExportFormat) =>
   `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "tier-list"}.${extension}`;
 
@@ -427,6 +441,7 @@ export const App = () => {
       if (!surface) {
         throw new Error("Presentation export surface is not available.");
       }
+      await waitForMediaPreviews(surface);
 
       const imageOptions = {
         backgroundColor: activeTheme.background,

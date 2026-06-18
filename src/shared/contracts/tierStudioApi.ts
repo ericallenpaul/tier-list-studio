@@ -6,6 +6,7 @@ import type {
   ItemUpdateInput,
   ListCreateInput,
   ListUpdateInput,
+  ManagedAssetPreview,
   OpenFilesOptions,
   OpenFilesResult,
   PositionMoveInput,
@@ -56,6 +57,9 @@ export interface TierStudioApi {
     update: (itemId: string, patch: ItemUpdateInput) => Promise<TierItem>;
     remove: (itemId: string) => Promise<void>;
     search: (query: ItemSearchInput) => Promise<TierItem[]>;
+  };
+  assets: {
+    getMediaDataUrl: (assetId: string) => Promise<ManagedAssetPreview>;
   };
   positions: {
     move: (input: PositionMoveInput) => Promise<TierPosition[]>;

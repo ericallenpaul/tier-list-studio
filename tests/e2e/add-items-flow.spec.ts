@@ -1,10 +1,14 @@
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const previewPng = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
+  "base64"
+);
 
 const createBoard = async (page: Page, name: string) => {
   await page.getByRole("button", { name: "New Board" }).click();
@@ -67,5 +71,33 @@ test.describe("add items flow", () => {
 
     await expect(page.getByRole("dialog", { name: "Add content" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Choose Images" })).toBeEnabled();
+  });
+
+  test("renders imported image media previews in build and presentation mode", async () => {
+    const openDialog = page.getByRole("dialog", { name: "Add content" });
+    if (await openDialog.isVisible().catch(() => false)) {
+      await page.getByRole("button", { name: "Close" }).click();
+    }
+    if (await page.getByRole("button", { name: "New Board" }).isVisible().catch(() => false)) {
+      await createBoard(page, "Imported Media Preview");
+    }
+
+    const imagePath = join(userDataDir, "preview pizza.png");
+    writeFileSync(imagePath, previewPng);
+    await app?.evaluate(({ dialog }, pickedPath) => {
+      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [pickedPath] });
+    }, imagePath);
+
+    await page.getByRole("button", { name: "Add Items" }).click();
+    await page.getByRole("tab", { name: "Images" }).click();
+    await page.getByRole("button", { name: "Choose Images" }).click();
+
+    await expect(page.getByRole("dialog", { name: "Add content" })).toBeHidden();
+    await expect(page.getByTestId("item-dock").getByRole("button", { name: "preview pizza" })).toBeVisible();
+    await expect(page.getByTestId("item-dock").locator("img.media-preview-image")).toHaveCount(1);
+
+    await page.getByRole("button", { name: "Presentation" }).click();
+    await expect(page.getByTestId("presentation-surface").getByTestId("item-dock").locator("img.media-preview-image"))
+      .toHaveCount(1);
   });
 });
