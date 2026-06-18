@@ -31,6 +31,5 @@ export const createEditorStore = (api: TierStudioApi): EditorStore => ({
 
     window.localStorage.setItem(activeListStorageKey, list.id);
     window.sessionStorage.setItem(activeListSessionKey, "open");
-    return list;
   }
 });
