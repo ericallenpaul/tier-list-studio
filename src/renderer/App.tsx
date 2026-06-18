@@ -10,7 +10,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { EditorPage } from "./pages/EditorPage";
 import { activeListSessionKey, activeListStorageKey, createEditorStore } from "./state/editorStore";
 import { loadPersistedState, type PersistedState } from "./state/persistedState";
-import { starterTemplates, type StarterTemplateSeed } from "./templates/starterTemplates";
+import { starterTemplates, type StarterTemplateSeed } from "../shared/templates/starterTemplates";
 
 type Theme = {
   name: string;
@@ -31,7 +31,8 @@ const makeBoard = (template: StarterTemplateSeed = fallbackTemplate): EditorBoar
   const rows = template.definition.rows.map<EditorTier>((row, index) => ({
     id: row.label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `row-${index + 1}`,
     label: row.label,
-    color: row.fillColor
+    color: row.fillColor,
+    textColor: row.textColor
   }));
 
   return {
@@ -358,7 +359,7 @@ export const App = () => {
 
     setBoard((current) => {
       const insertIndex = afterRowId ? current.tiers.findIndex((tier) => tier.id === afterRowId) + 1 : current.tiers.length;
-      const nextTier = { id: `row-${Date.now()}`, label: "New", color: "#64748b" };
+      const nextTier = { id: `row-${Date.now()}`, label: "New", color: "#64748b", textColor: "#ffffff" };
       return {
         ...current,
         tiers: [

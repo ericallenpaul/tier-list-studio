@@ -24,7 +24,8 @@ const normalizeTier = (tier: unknown, index: number): EditorTier => {
   return {
     id: typeof record.id === "string" && record.id.trim() ? record.id : `tier-${index + 1}`,
     label: typeof record.label === "string" && record.label.trim() ? record.label : `Tier ${index + 1}`,
-    color: typeof record.color === "string" && record.color.trim() ? record.color : "#64748b"
+    color: typeof record.color === "string" && record.color.trim() ? record.color : "#64748b",
+    textColor: typeof record.textColor === "string" && record.textColor.trim() ? record.textColor : "#ffffff"
   };
 };
 

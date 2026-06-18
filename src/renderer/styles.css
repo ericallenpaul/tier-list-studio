@@ -749,7 +749,9 @@ button {
 }
 
 .item-chip.placed {
-  background: rgba(15, 23, 42, 0.95);
+  background: var(--presentation-item-bg, rgba(15, 23, 42, 0.95));
+  border-color: var(--presentation-item-border, rgba(148, 163, 184, 0.16));
+  color: var(--presentation-item-color, #e2e8f0);
 }
 
 .pool-strip {

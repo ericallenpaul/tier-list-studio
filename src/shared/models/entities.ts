@@ -26,6 +26,7 @@ export interface TierRow {
   listId: EntityId;
   label: string;
   color: string;
+  textColor: string;
   sortOrder: number;
   style: JsonRecord;
   createdAt: IsoTimestamp;
@@ -77,7 +78,7 @@ export interface TierTemplate {
   id: EntityId;
   name: string;
   sourceListId?: EntityId;
-  rows: Array<Pick<TierRow, "label" | "color" | "style">>;
+  rows: Array<Pick<TierRow, "label" | "color" | "textColor" | "style">>;
   style: JsonRecord;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;

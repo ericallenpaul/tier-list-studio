@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { starterTemplates } from "../../../renderer/templates/starterTemplates.js";
+import { starterTemplates } from "../../../shared/templates/starterTemplates.js";
 import type { SqliteDatabase } from "./connection.js";
 
 const migrationId = 1;

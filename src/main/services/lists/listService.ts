@@ -442,6 +442,7 @@ const mapRow = (row: TierRowRecord): TierRow => ({
   listId: row.tierListId,
   label: row.label,
   color: row.fillColor,
+  textColor: row.textColor,
   sortOrder: row.sortOrder,
   style: row.style,
   createdAt: row.createdAt,

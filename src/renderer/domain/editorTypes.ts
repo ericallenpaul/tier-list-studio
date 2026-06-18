@@ -11,6 +11,7 @@ export type EditorTier = {
   id: string;
   label: string;
   color: string;
+  textColor: string;
 };
 
 export type EditorBoardItem = {

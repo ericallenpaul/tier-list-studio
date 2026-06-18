@@ -111,7 +111,7 @@ const SortableTierRow = ({
         }
       }}
     >
-      <div className="tier-label" style={{ backgroundColor: tier.color }}>
+      <div className="tier-label" style={{ backgroundColor: tier.color, color: tier.textColor }}>
         <span>{tier.label}</span>
         {canEditRows ? (
           <div className="row-controls" onClick={(event) => event.stopPropagation()}>

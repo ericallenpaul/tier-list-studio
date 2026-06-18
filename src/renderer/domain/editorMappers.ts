@@ -1,11 +1,11 @@
 import type { EditorBoardItem, EditorBoardState, EditorTier, ListWithItems, TierList } from "./editorTypes";
 
 export const defaultEditorTiers: EditorTier[] = [
-  { id: "s", label: "S", color: "#ef4444" },
-  { id: "a", label: "A", color: "#f97316" },
-  { id: "b", label: "B", color: "#eab308" },
-  { id: "c", label: "C", color: "#22c55e" },
-  { id: "d", label: "D", color: "#3b82f6" }
+  { id: "s", label: "S", color: "#ef4444", textColor: "#ffffff" },
+  { id: "a", label: "A", color: "#f97316", textColor: "#111827" },
+  { id: "b", label: "B", color: "#eab308", textColor: "#111827" },
+  { id: "c", label: "C", color: "#22c55e", textColor: "#111827" },
+  { id: "d", label: "D", color: "#3b82f6", textColor: "#ffffff" }
 ];
 
 export const mapTierListToBoard = (list: ListWithItems): EditorBoardState => {
@@ -16,7 +16,8 @@ export const mapTierListToBoard = (list: ListWithItems): EditorBoardState => {
         .map<EditorTier>((row) => ({
           id: row.id,
           label: row.label,
-          color: row.color
+          color: row.color,
+          textColor: row.textColor
         }))
     : defaultEditorTiers.map((tier) => ({ ...tier }));
 

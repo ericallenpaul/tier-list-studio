@@ -374,6 +374,7 @@ const mapTemplate = (template: TemplateRecord): TierTemplate => {
             : typeof row.color === "string"
               ? row.color
               : "#64748b",
+          textColor: typeof row.textColor === "string" ? row.textColor : "#111827",
           style: isRecord(row.style) ? row.style : {}
         }))
         .filter((row) => row.label)
