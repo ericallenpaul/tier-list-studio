@@ -14,6 +14,7 @@ import type {
   RowUpdateInput,
   SaveFileOptions,
   SaveFileResult,
+  TierListDetail,
   SettingsUpdateInput,
   TierStudioDomainResults,
   WorkspaceCreateInput,
@@ -37,7 +38,7 @@ export interface TierStudioApi {
   };
   lists: {
     list: (workspaceId: string) => Promise<TierList[]>;
-    get: (id: string) => Promise<TierList | undefined>;
+    get: (id: string) => Promise<TierListDetail | undefined>;
     create: (input: ListCreateInput) => Promise<TierList>;
     update: (id: string, patch: ListUpdateInput) => Promise<TierList>;
     duplicate: (id: string) => Promise<TierList>;

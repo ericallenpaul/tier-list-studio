@@ -56,6 +56,12 @@ export interface GeneratedItemsResult {
   items: Array<Pick<TierItem, "label" | "metadata">>;
 }
 
+export type TierListDetail = TierList & {
+  items?: TierItem[];
+  rows?: TierRow[];
+  positions?: TierPosition[];
+};
+
 export interface TierStudioDomainResults {
   app: {
     getVersion: string;
@@ -72,7 +78,7 @@ export interface TierStudioDomainResults {
   };
   lists: {
     list: TierList[];
-    get: TierList | undefined;
+    get: TierListDetail | undefined;
     create: TierList;
     update: TierList;
     duplicate: TierList;

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { constants, createReadStream } from "node:fs";
+import { copyFile, mkdir, open, stat } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 
 import type { TierStudioServices } from "../../../shared/contracts/tierStudioApi.js";
@@ -25,7 +26,7 @@ import {
   WorkspaceRepository
 } from "../repositories/index.js";
 import type { ItemRecord, JsonObject, JsonValue, TierListRecord, TierRowRecord, WorkspaceRecord } from "../repositories/types.js";
-import { createPositionService } from "../positions/positionService.js";
+import { createPositionService, mapPosition } from "../positions/positionService.js";
 
 const defaultRows = [
   { label: "S", fillColor: "#ef4444", textColor: "#ffffff" },
@@ -239,7 +240,14 @@ export const createCoreListServices = (db: SqliteDatabase, options: CoreListServ
       list: (workspaceId: string) => lists.listByWorkspace(workspaceId).map(mapList),
       get: (id: string) => {
         const list = lists.get(id);
-        return list ? { ...mapList(list), items: items.listByTierList(id).map(mapItem) } : undefined;
+        return list
+          ? {
+              ...mapList(list),
+              rows: rows.listByTierList(id).map(mapRow),
+              items: items.listByTierList(id).map(mapItem),
+              positions: positions.listByTierList(id).map(mapPosition)
+            }
+          : undefined;
       },
       create: createList,
       update: updateList,
@@ -324,30 +332,28 @@ export const createCoreListServices = (db: SqliteDatabase, options: CoreListServ
         });
         return created().map(mapItem);
       },
-      importAssets: (listId: string, filePaths: string[]) => {
-        const imported = db.transaction(() => {
-          if (!lists.get(listId)) {
-            throw new Error(`Tier list not found: ${listId}`);
-          }
+      importAssets: async (listId: string, filePaths: string[]) => {
+        if (!lists.get(listId)) {
+          throw new Error(`Tier list not found: ${listId}`);
+        }
 
+        const mediaFiles = await Promise.all(filePaths.map((filePath) => inspectMediaFile(filePath)));
+        await mkdir(join(userDataPath, "assets"), { recursive: true });
+        await Promise.all(mediaFiles.map((media) => copyManagedAsset(media.sourcePath, join(userDataPath, media.managedRelPath))));
+
+        const imported = db.transaction(() => {
           const startOrder = maxSortOrder(db, listId, null) + 1;
-          return filePaths.map((filePath, index) => {
-            const media = inspectMediaFile(filePath);
+          return mediaFiles.map((media, index) => {
             const asset = assets.getOrCreate({
               sha256: media.sha256,
               originalName: media.originalName,
               mimeType: media.mimeType,
               extension: media.extension,
               byteSize: media.byteSize,
-              sourcePath: filePath,
+              sourcePath: media.sourcePath,
               managedRelPath: media.managedRelPath,
               metadata: { importedAt: new Date().toISOString() }
             });
-            const managedPath = join(userDataPath, asset.managedRelPath);
-            mkdirSync(join(userDataPath, "assets"), { recursive: true });
-            if (!existsSync(managedPath)) {
-              copyFileSync(filePath, managedPath);
-            }
 
             const item = items.create({
               tierListId: listId,
@@ -502,7 +508,19 @@ const mimeTypesByExtension: Record<string, string> = {
 const imageExtensions = new Set(["gif", "jpeg", "jpg", "png", "webp"]);
 const videoExtensions = new Set(["m4v", "mov", "mp4", "webm"]);
 
-const inspectMediaFile = (filePath: string) => {
+type InspectedMediaFile = {
+  kind: "image" | "video";
+  sha256: string;
+  originalName: string;
+  label: string;
+  extension: string;
+  byteSize: number;
+  mimeType: string;
+  managedRelPath: string;
+  sourcePath: string;
+};
+
+const inspectMediaFile = async (filePath: string): Promise<InspectedMediaFile> => {
   const extension = extname(filePath).replace(".", "").toLowerCase();
   const kind: "image" | "video" | undefined = imageExtensions.has(extension)
     ? "image"
@@ -513,8 +531,15 @@ const inspectMediaFile = (filePath: string) => {
     throw new Error(`Unsupported media file type: ${filePath}`);
   }
 
-  const bytes = readFileSync(filePath);
-  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  const [fileStat, header, sha256] = await Promise.all([
+    stat(filePath),
+    readHeader(filePath),
+    hashFile(filePath)
+  ]);
+  if (!isSupportedMediaSignature(extension, header)) {
+    throw new Error(`Unsupported or invalid media file content: ${filePath}`);
+  }
+
   const originalName = basename(filePath);
   const label = basename(filePath, extname(filePath)).trim() || originalName;
 
@@ -524,10 +549,63 @@ const inspectMediaFile = (filePath: string) => {
     originalName,
     label,
     extension,
-    byteSize: statSync(filePath).size,
+    byteSize: fileStat.size,
     mimeType: mimeTypesByExtension[extension] ?? `${kind}/${extension}`,
-    managedRelPath: join("assets", `${sha256}.${extension}`)
+    managedRelPath: join("assets", `${sha256}.${extension}`),
+    sourcePath: filePath
   };
+};
+
+const readHeader = async (filePath: string, length = 64) => {
+  const handle = await open(filePath, "r");
+  try {
+    const buffer = Buffer.alloc(length);
+    const { bytesRead } = await handle.read(buffer, 0, length, 0);
+    return buffer.subarray(0, bytesRead);
+  } finally {
+    await handle.close();
+  }
+};
+
+const hashFile = (filePath: string) =>
+  new Promise<string>((resolve, reject) => {
+    const hash = createHash("sha256");
+    const stream = createReadStream(filePath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("error", reject);
+    stream.on("end", () => resolve(hash.digest("hex")));
+  });
+
+const copyManagedAsset = async (sourcePath: string, managedPath: string) => {
+  try {
+    await copyFile(sourcePath, managedPath, constants.COPYFILE_EXCL);
+  } catch (caught) {
+    if ((caught as NodeJS.ErrnoException).code !== "EEXIST") {
+      throw caught;
+    }
+  }
+};
+
+const isSupportedMediaSignature = (extension: string, header: Buffer) => {
+  switch (extension) {
+    case "png":
+      return header.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    case "jpg":
+    case "jpeg":
+      return header.length >= 3 && header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff;
+    case "gif":
+      return header.subarray(0, 6).toString("ascii") === "GIF87a" || header.subarray(0, 6).toString("ascii") === "GIF89a";
+    case "webp":
+      return header.subarray(0, 4).toString("ascii") === "RIFF" && header.subarray(8, 12).toString("ascii") === "WEBP";
+    case "webm":
+      return header.length >= 4 && header[0] === 0x1a && header[1] === 0x45 && header[2] === 0xdf && header[3] === 0xa3;
+    case "m4v":
+    case "mov":
+    case "mp4":
+      return header.subarray(4, 8).toString("ascii") === "ftyp";
+    default:
+      return false;
+  }
 };
 
 const escapeFtsQuery = (query: string) => `"${query.replace(/"/g, "\"\"")}"`;

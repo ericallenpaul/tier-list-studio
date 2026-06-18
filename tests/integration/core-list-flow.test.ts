@@ -10,6 +10,7 @@ import { runMigrations } from "../../src/main/services/db/migrations.js";
 import { createCoreListServices } from "../../src/main/services/lists/listService.js";
 import { RowRepository } from "../../src/main/services/repositories/index.js";
 import { createTierStudioApi } from "../../src/preload/api.cjs";
+import { mapTierListToBoard } from "../../src/renderer/domain/editorMappers.js";
 import type { TierStudioChannel } from "../../src/preload/channelTypes.cjs";
 import type { AppPaths, TierStudioServices } from "../../src/shared/contracts/tierStudioApi.js";
 
@@ -118,6 +119,15 @@ describe("core list services and IPC", () => {
 
     const reopenedList = services.lists.get(list.id);
     expect(reopenedList).toEqual(expect.objectContaining({ id: list.id, name: "Launch Snacks" }));
+    expect(reopenedList?.rows?.map((row) => row.label)).toEqual(["S", "A", "B", "C", "D"]);
+    expect(reopenedList?.positions?.map((position) => position.itemId)).toEqual([items[2].id, items[1].id, items[0].id]);
+
+    const reopenedBoard = mapTierListToBoard(reopenedList!);
+    expect(reopenedBoard.items.filter((item) => item.container === "pool").map((item) => item.label)).toEqual(["Pizza"]);
+    expect(reopenedBoard.items.filter((item) => item.container === rows[0].id).map((item) => item.label)).toEqual([
+      "Coffee",
+      "Ramen"
+    ]);
 
     const reopenedSearch = services.items.search({ text: "coffee", listId: list.id });
     expect(reopenedSearch.map((item) => item.id)).toEqual([items[1].id]);
@@ -128,5 +138,26 @@ describe("core list services and IPC", () => {
       items[0].id
     ]);
     expect(reopenedPositions.filter((position) => position.rowId === null).map((position) => position.itemId)).toEqual([items[2].id]);
+  });
+
+  it("rejects ungranted IPC asset imports before reaching core services", async () => {
+    const ipcMain = new FakeIpcMain();
+    const paths: AppPaths = {
+      userData: tempDir,
+      documents: tempDir,
+      temp: tempDir
+    };
+    registerHandlers(
+      ipcMain,
+      {
+        getVersion: () => "0.1.0-test",
+        getPath: (name) => paths[name as keyof AppPaths]
+      },
+      { services: services as Partial<TierStudioServices> }
+    );
+    const api = createTierStudioApi((channel, payload) => ipcMain.invoke(channel, payload));
+
+    await expect(Promise.resolve().then(() => api.items.importAssets("list-1", [join(tempDir, "unpicked.png")])))
+      .rejects.toThrow(/file picker/i);
   });
 });

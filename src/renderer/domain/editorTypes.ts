@@ -1,4 +1,4 @@
-import type { TierItem, TierList, Workspace } from "../../shared/models/entities";
+import type { TierItem, TierList, TierPosition, TierRow, Workspace } from "../../shared/models/entities";
 
 export type { TierList, Workspace };
 
@@ -38,4 +38,6 @@ export type EditorStore = {
 
 export type ListWithItems = TierList & {
   items?: TierItem[];
+  rows?: TierRow[];
+  positions?: TierPosition[];
 };

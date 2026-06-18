@@ -50,16 +50,26 @@ export const AddItemsModal = ({ listId, onClose, onItemsAdded }: AddItemsModalPr
   };
 
   const importMedia = (mediaMode: "images" | "video") => {
-    void finish(async () => {
-      const result = await window.tierStudio.dialogs.openFiles({
-        multiple: true,
-        filters: mediaFilters[mediaMode]
-      });
-      if (result.canceled || result.filePaths.length === 0) {
-        return;
+    setError(null);
+    setIsSubmitting(true);
+    void (async () => {
+      try {
+        const result = await window.tierStudio.dialogs.openFiles({
+          multiple: true,
+          filters: mediaFilters[mediaMode]
+        });
+        if (result.canceled || result.filePaths.length === 0) {
+          return;
+        }
+        await window.tierStudio.items.importAssets(listId, result.filePaths);
+        await onItemsAdded();
+        onClose();
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "Could not add items.");
+      } finally {
+        setIsSubmitting(false);
       }
-      await window.tierStudio.items.importAssets(listId, result.filePaths);
-    });
+    })();
   };
 
   return (

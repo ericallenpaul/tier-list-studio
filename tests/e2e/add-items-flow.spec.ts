@@ -52,4 +52,20 @@ test.describe("add items flow", () => {
     await expect(page.getByTestId("item-dock")).toContainText("Pizza");
     await expect(page.getByTestId("item-dock")).toContainText("Tacos");
   });
+
+  test("keeps the Add Items modal open when media picking is canceled", async () => {
+    if (await page.getByRole("button", { name: "New Board" }).isVisible()) {
+      await createBoard(page, "Canceled Picker");
+    }
+    await app?.evaluate(({ dialog }) => {
+      dialog.showOpenDialog = async () => ({ canceled: true, filePaths: [] });
+    });
+
+    await page.getByRole("button", { name: "Add Items" }).click();
+    await page.getByRole("tab", { name: "Images" }).click();
+    await page.getByRole("button", { name: "Choose Images" }).click();
+
+    await expect(page.getByRole("dialog", { name: "Add content" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Choose Images" })).toBeEnabled();
+  });
 });

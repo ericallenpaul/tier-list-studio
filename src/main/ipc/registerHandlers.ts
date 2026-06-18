@@ -1,6 +1,6 @@
 import { dialog, type App } from "electron";
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import type { ZodType } from "zod";
 
 import { tierStudioChannels, type TierStudioChannel } from "../../preload/channelTypes.cjs";
@@ -113,12 +113,43 @@ type RegisterHandlerOptions = {
   services?: Partial<TierStudioServices>;
 };
 
+const dialogGrantTtlMs = 5 * 60 * 1000;
+
+const normalizeGrantedPath = (filePath: string) => resolve(filePath);
+
+const grantDialogFilePaths = (grantedFilePaths: Set<string>, filePaths: string[]) => {
+  for (const filePath of filePaths) {
+    const normalized = normalizeGrantedPath(filePath);
+    grantedFilePaths.add(normalized);
+    const timeout = setTimeout(() => grantedFilePaths.delete(normalized), dialogGrantTtlMs);
+    if (typeof timeout === "object" && "unref" in timeout) {
+      timeout.unref();
+    }
+  }
+};
+
+const consumeDialogFilePathGrants = (grantedFilePaths: Set<string>, filePaths: string[]) => {
+  const normalizedPaths = filePaths.map(normalizeGrantedPath);
+  const uniquePaths = new Set(normalizedPaths);
+  if (uniquePaths.size !== normalizedPaths.length) {
+    throw new Error("Import file paths must be unique.");
+  }
+  const ungrantedPath = normalizedPaths.find((filePath) => !grantedFilePaths.has(filePath));
+  if (ungrantedPath) {
+    throw new Error(`Import file path was not selected through the file picker: ${ungrantedPath}`);
+  }
+  normalizedPaths.forEach((filePath) => grantedFilePaths.delete(filePath));
+
+  return normalizedPaths;
+};
+
 export const registerHandlers = (
   ipcMain: IpcMainLike,
   app: Pick<App, "getVersion" | "getPath">,
   options: RegisterHandlerOptions = {}
 ) => {
   const coreServices = () => (options.services as CoreListServices | undefined) ?? getProductionCoreServices(app);
+  const grantedFilePaths = new Set<string>();
 
   registerValidatedHandler(ipcMain, tierStudioChannels.app.getVersion, voidPayloadSchema, () => app.getVersion());
   registerValidatedHandler(ipcMain, tierStudioChannels.app.getPaths, voidPayloadSchema, () => ({
@@ -134,6 +165,10 @@ export const registerHandlers = (
       filters: input.filters,
       properties: input.multiple ? ["openFile", "multiSelections"] : ["openFile"]
     });
+
+    if (!result.canceled) {
+      grantDialogFilePaths(grantedFilePaths, result.filePaths);
+    }
 
     return {
       canceled: result.canceled,
@@ -159,7 +194,8 @@ export const registerHandlers = (
   registerValidatedHandler(ipcMain, tierStudioChannels.rows.remove, rowIdPayloadSchema, ({ rowId }) => coreServices().rows.remove(rowId));
 
   registerValidatedHandler(ipcMain, tierStudioChannels.items.addTextBatch, addTextBatchPayloadSchema, ({ listId, lines }) => coreServices().items.addTextBatch(listId, lines));
-  registerValidatedHandler(ipcMain, tierStudioChannels.items.importAssets, importAssetsPayloadSchema, ({ listId, filePaths }) => coreServices().items.importAssets(listId, filePaths));
+  registerValidatedHandler(ipcMain, tierStudioChannels.items.importAssets, importAssetsPayloadSchema, ({ listId, filePaths }) =>
+    coreServices().items.importAssets(listId, consumeDialogFilePathGrants(grantedFilePaths, filePaths)));
   registerValidatedHandler(ipcMain, tierStudioChannels.items.update, itemUpdatePayloadSchema, ({ itemId, patch }) => coreServices().items.update(itemId, patch));
   registerValidatedHandler(ipcMain, tierStudioChannels.items.remove, itemIdPayloadSchema, ({ itemId }) => coreServices().items.remove(itemId));
   registerValidatedHandler(ipcMain, tierStudioChannels.items.search, itemSearchInputSchema, (input) => coreServices().items.search(input));

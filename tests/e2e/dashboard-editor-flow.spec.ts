@@ -74,7 +74,7 @@ test.describe("dashboard editor flow", () => {
         const state = JSON.parse(raw) as {
           board?: { items?: Array<{ label: string; container: string }> };
         };
-        return state.board?.items?.some((item) => item.label === expectedName && item.container === "s") ?? false;
+        return state.board?.items?.some((item) => item.label === expectedName && item.container !== "pool") ?? false;
       },
       { expectedName: itemName }
     );
