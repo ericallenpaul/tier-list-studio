@@ -33,7 +33,7 @@ export type DashboardState = {
 export type EditorStore = {
   loadDashboard: () => Promise<DashboardState>;
   createBoard: (name: string) => Promise<string>;
-  openBoard: (listId: string) => Promise<void>;
+  openBoard: (listId: string) => Promise<TierList>;
 };
 
 export type ListWithItems = TierList & {

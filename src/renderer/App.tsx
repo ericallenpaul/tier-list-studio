@@ -154,9 +154,8 @@ export const App = () => {
 
     let isMounted = true;
     editorStore.openBoard(savedListId)
-      .then(() => window.tierStudio.lists.get(savedListId))
       .then((list) => {
-        if (isMounted && list) {
+        if (isMounted) {
           setBoard(mapTierListToBoard(list));
         }
       })
@@ -286,12 +285,7 @@ export const App = () => {
   };
 
   const openBoard = async (listId: string) => {
-    await editorStore.openBoard(listId);
-    const list = await window.tierStudio.lists.get(listId);
-    if (!list) {
-      return;
-    }
-
+    const list = await editorStore.openBoard(listId);
     setBoard(mapTierListToBoard(list));
     setSelectedItemId(null);
     setScreen("board");

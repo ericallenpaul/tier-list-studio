@@ -68,7 +68,7 @@ export type EditorStore = {
 };
 ```
 
-Use `window.tierStudio.workspaces.create`, `lists.create`, `rows.insert`, and `lists.get`. Seed S/A/B/C/D rows on create.
+Use `window.tierStudio.workspaces.create`, `lists.create`, and `lists.get`. The main `lists.create` service owns seeding S/A/B/C/D rows.
 
 - [ ] **Step 4: Verify**
 
@@ -384,7 +384,8 @@ Expected: PASS.
 **Files:**
 - Create: `src/renderer/templates/starterTemplates.ts`
 - Modify: `electron-builder.yml`
-- Modify: `.github/workflows/release.yml`
+- Modify: `package.json`
+- Create: `docs/release/manual-packaging.md`
 - Test: `tests/e2e/presentation-polish.spec.ts`
 
 - [ ] **Step 1: Write failing presentation visual test**
@@ -412,7 +413,7 @@ corepack pnpm package:win
 corepack pnpm run build
 ```
 
-Expected: Windows NSIS installer exists in `release/`. GitHub Actions should build Windows, macOS, and Linux artifacts from the release workflow.
+Expected: Windows NSIS installer exists in `release/`. macOS and Linux package scripts are documented for local builds on those platforms. Do not add GitHub Actions, CI, or automated release publishing; attach installers manually to GitHub releases when needed.
 
 ---
 
@@ -438,4 +439,4 @@ Expected: Windows NSIS installer exists in `release/`. GitHub Actions should bui
 - Settings and provider abstraction: Task 6.
 - Presentation polish and clean export surface: Task 8, building on current baseline.
 - PNG/JPEG/JSON package/CSV/backups: Task 8.
-- Cross-platform installer release: Task 9.
+- Cross-platform installer release: Task 9 documents local/manual packaging only. No CI/CD or GitHub Actions are part of this project.

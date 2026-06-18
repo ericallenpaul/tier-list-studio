@@ -1,7 +1,8 @@
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
-import { rmSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { mkdtempSync, rmSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
@@ -24,10 +25,12 @@ const runBuild = () => {
 test.describe("dashboard editor flow", () => {
   let app: ElectronApplication | undefined;
   let page: Page;
+  let userDataDir: string;
 
   test.beforeAll(async () => {
     test.setTimeout(60_000);
     runBuild();
+    userDataDir = mkdtempSync(join(tmpdir(), "tier-list-studio-e2e-"));
 
     app = await electron.launch({
       args: [projectRoot],
@@ -35,6 +38,7 @@ test.describe("dashboard editor flow", () => {
       env: {
         ...process.env,
         ELECTRON_DISABLE_SECURITY_WARNINGS: "true",
+        TIER_LIST_STUDIO_USER_DATA: userDataDir,
         VITE_DEV_SERVER_URL: ""
       }
     });
@@ -44,6 +48,9 @@ test.describe("dashboard editor flow", () => {
 
   test.afterAll(async () => {
     await app?.close();
+    if (userDataDir) {
+      rmSync(userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 });
+    }
   });
 
   test("creates a board from the dashboard and reopens it after reload", async () => {

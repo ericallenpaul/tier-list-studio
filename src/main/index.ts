@@ -3,6 +3,11 @@ import { app, BrowserWindow, ipcMain, Menu } from "electron";
 import { registerHandlers } from "./ipc/registerHandlers.js";
 import { createMainWindow } from "./windows/createMainWindow.js";
 
+const testUserDataPath = process.env.TIER_LIST_STUDIO_USER_DATA;
+if (testUserDataPath) {
+  app.setPath("userData", testUserDataPath);
+}
+
 registerHandlers(ipcMain, app);
 
 app.whenReady().then(() => {

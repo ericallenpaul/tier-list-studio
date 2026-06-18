@@ -2,14 +2,6 @@ import type { TierStudioApi } from "../../shared/contracts/tierStudioApi";
 import type { EditorStore } from "../domain/editorTypes";
 import { sortRecentLists } from "../domain/editorMappers";
 
-const defaultRows = [
-  { label: "S", color: "#ef4444" },
-  { label: "A", color: "#f97316" },
-  { label: "B", color: "#eab308" },
-  { label: "C", color: "#22c55e" },
-  { label: "D", color: "#3b82f6" }
-];
-
 export const activeListStorageKey = "tier-list-studio-active-list-id";
 export const activeListSessionKey = "tier-list-studio-editor-session";
 
@@ -27,10 +19,6 @@ export const createEditorStore = (api: TierStudioApi): EditorStore => ({
     const workspace = await api.workspaces.create({ name: "Tier List Studio" });
     const list = await api.lists.create({ workspaceId: workspace.id, name });
 
-    for (const row of defaultRows) {
-      await api.rows.insert(list.id, row);
-    }
-
     return list.id;
   },
   openBoard: async (listId: string) => {
@@ -43,5 +31,6 @@ export const createEditorStore = (api: TierStudioApi): EditorStore => ({
 
     window.localStorage.setItem(activeListStorageKey, list.id);
     window.sessionStorage.setItem(activeListSessionKey, "open");
+    return list;
   }
 });

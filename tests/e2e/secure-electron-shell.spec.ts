@@ -1,10 +1,14 @@
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const require = createRequire(import.meta.url);
+const betterSqliteBuild = resolve(dirname(require.resolve("better-sqlite3/package.json")), "build");
 const packageJson = JSON.parse(readFileSync(resolve(projectRoot, "package.json"), "utf-8")) as {
   version: string;
 };
@@ -14,15 +18,42 @@ const runBuild = () => {
     cwd: projectRoot,
     stdio: "inherit"
   });
+  rmSync(betterSqliteBuild, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 });
+  execSync("corepack pnpm exec electron-builder install-app-deps", {
+    cwd: projectRoot,
+    stdio: "inherit"
+  });
+};
+
+const createBoard = async (page: Page, name: string) => {
+  await page.getByRole("button", { name: "New Board" }).click();
+  await page.getByLabel("Board title").fill(name);
+  await page.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByRole("heading", { name })).toBeVisible();
+};
+
+const ensureBoardOpen = async (page: Page, name: string) => {
+  const newBoardButton = page.getByRole("button", { name: "New Board" });
+  if (await newBoardButton.isVisible()) {
+    await createBoard(page, name);
+    return;
+  }
+
+  if (!(await page.getByRole("button", { name: "Export" }).isVisible())) {
+    await page.keyboard.press("Escape");
+  }
+  await expect(page.getByRole("button", { name: "Export" })).toBeVisible();
 };
 
 test.describe("secure Electron shell", () => {
   let app: ElectronApplication | undefined;
   let page: Page;
+  let userDataDir: string;
 
   test.beforeAll(async () => {
     test.setTimeout(60_000);
     runBuild();
+    userDataDir = mkdtempSync(join(tmpdir(), "tier-list-studio-e2e-"));
 
     app = await electron.launch({
       args: [projectRoot],
@@ -30,6 +61,7 @@ test.describe("secure Electron shell", () => {
       env: {
         ...process.env,
         ELECTRON_DISABLE_SECURITY_WARNINGS: "true",
+        TIER_LIST_STUDIO_USER_DATA: userDataDir,
         VITE_DEV_SERVER_URL: ""
       }
     });
@@ -39,6 +71,9 @@ test.describe("secure Electron shell", () => {
 
   test.afterAll(async () => {
     await app?.close();
+    if (userDataDir) {
+      rmSync(userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 });
+    }
   });
 
   test("exposes the app version through the bridge only", async () => {
@@ -66,6 +101,7 @@ test.describe("secure Electron shell", () => {
   });
 
   test("presentation mode hides editor controls but keeps the board draggable", async () => {
+    await ensureBoardOpen(page, "Presentation Shell");
     await page.getByRole("button", { name: "Presentation" }).click();
 
     await expect(page.locator(".topbar")).toBeHidden();
@@ -78,6 +114,8 @@ test.describe("secure Electron shell", () => {
   });
 
   test("export writes a png artifact of the presentation surface", async () => {
+    await ensureBoardOpen(page, "Export Shell");
+
     const exportPromise = page.evaluate(() =>
       new Promise<{ filePath: string; format: string }>((resolve) => {
         window.addEventListener(
@@ -92,7 +130,7 @@ test.describe("secure Electron shell", () => {
 
     const artifact = await exportPromise;
     expect(artifact.format).toBe("png");
-    expect(artifact.filePath).toMatch(/launch-week.*\.png$/i);
+    expect(artifact.filePath).toMatch(/(?:presentation|export)-shell.*\.png$/i);
     expect(existsSync(artifact.filePath)).toBe(true);
     await expect(page.locator(".topbar")).toBeHidden();
   });
