@@ -41,29 +41,63 @@ export const serializeListCsv = (list: TierListDetail) => {
   const positionsByItemId = new Map((list.positions ?? []).map((position) => [position.itemId, position]));
   const rowsById = new Map((list.rows ?? []).map((row) => [row.id, row]));
   const rows = [csvHeaders];
+  const itemsById = new Map((list.items ?? []).map((item) => [item.id, item]));
+  const sortedRows = [...(list.rows ?? [])].sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id));
 
-  const sortedItems = [...(list.items ?? [])].sort((left, right) => {
-    const leftPosition = positionsByItemId.get(left.id);
-    const rightPosition = positionsByItemId.get(right.id);
-    const leftRow = leftPosition?.rowId ? rowsById.get(leftPosition.rowId) : undefined;
-    const rightRow = rightPosition?.rowId ? rowsById.get(rightPosition.rowId) : undefined;
+  for (const row of sortedRows) {
+    const rowPositions = [...(list.positions ?? [])]
+      .filter((position) => position.rowId === row.id && itemsById.has(position.itemId))
+      .sort((left, right) => left.sortOrder - right.sortOrder || left.itemId.localeCompare(right.itemId));
 
-    return (leftRow?.sortOrder ?? Number.MAX_SAFE_INTEGER) - (rightRow?.sortOrder ?? Number.MAX_SAFE_INTEGER)
-      || (leftPosition?.sortOrder ?? Number.MAX_SAFE_INTEGER) - (rightPosition?.sortOrder ?? Number.MAX_SAFE_INTEGER)
-      || left.label.localeCompare(right.label)
-      || left.id.localeCompare(right.id);
-  });
+    if (rowPositions.length === 0) {
+      rows.push([
+        list.id,
+        list.name,
+        row.id,
+        row.label,
+        String(row.sortOrder),
+        "tier",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ]);
+      continue;
+    }
 
-  for (const item of sortedItems) {
+    for (const position of rowPositions) {
+      const item = itemsById.get(position.itemId);
+      if (!item) {
+        continue;
+      }
+      rows.push(createCsvItemRow(list, row, item, position));
+    }
+  }
+
+  const poolItems = [...(list.items ?? [])]
+    .filter((item) => {
+      const position = positionsByItemId.get(item.id);
+      return !position?.rowId || !rowsById.has(position.rowId);
+    })
+    .sort((left, right) => {
+      const leftPosition = positionsByItemId.get(left.id);
+      const rightPosition = positionsByItemId.get(right.id);
+
+      return (leftPosition?.sortOrder ?? Number.MAX_SAFE_INTEGER) - (rightPosition?.sortOrder ?? Number.MAX_SAFE_INTEGER)
+        || left.label.localeCompare(right.label)
+        || left.id.localeCompare(right.id);
+    });
+
+  for (const item of poolItems) {
     const position = positionsByItemId.get(item.id);
-    const row = position?.rowId ? rowsById.get(position.rowId) : undefined;
     rows.push([
       list.id,
       list.name,
-      row?.id ?? "",
-      row?.label ?? "",
-      row ? String(row.sortOrder) : "",
-      row ? "tier" : "pool",
+      "",
+      "",
+      "",
+      "pool",
       item.id,
       item.label,
       item.kind,
@@ -74,6 +108,25 @@ export const serializeListCsv = (list: TierListDetail) => {
 
   return `${rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n")}\n`;
 };
+
+const createCsvItemRow = (
+  list: TierListDetail,
+  row: NonNullable<TierListDetail["rows"]>[number],
+  item: NonNullable<TierListDetail["items"]>[number],
+  position: NonNullable<TierListDetail["positions"]>[number]
+) => [
+  list.id,
+  list.name,
+  row.id,
+  row.label,
+  String(row.sortOrder),
+  "tier",
+  item.id,
+  item.label,
+  item.kind,
+  String(position.sortOrder),
+  JSON.stringify(item.metadata)
+];
 
 const escapeCsvCell = (value: string) => {
   if (/[",\r\n]/.test(value)) {

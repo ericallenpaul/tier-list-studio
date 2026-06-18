@@ -1,4 +1,5 @@
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import type { Stats } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 
 import type { TierListDetail } from "../../../shared/models/api.js";
@@ -10,6 +11,7 @@ type ExportPackageOptions = {
   documentsPath: string;
   assetRecords?: MediaAssetRecord[];
   filePath?: string;
+  fileSystem?: PackageAssetFileSystem;
   maxEmbeddedAssetBytes?: number;
   userDataPath?: string;
 };
@@ -100,9 +102,23 @@ export type PackageAsset = Omit<MediaAssetRecord, "sourcePath"> & {
 
 const defaultMaxEmbeddedAssetBytes = 50 * 1024 * 1024;
 
+type PackageAssetFileSystem = {
+  readFile: typeof readFile;
+  stat: typeof stat;
+};
+
+type PackageAssetStatResult =
+  | { exists: true; stat: Stats }
+  | { exists: false; error?: unknown };
+
+const defaultFileSystem: PackageAssetFileSystem = {
+  readFile,
+  stat
+};
+
 const collectPackageAssets = async (
   list: TierListDetail,
-  options: Pick<ExportPackageOptions, "assetRecords" | "maxEmbeddedAssetBytes" | "userDataPath">
+  options: Pick<ExportPackageOptions, "assetRecords" | "fileSystem" | "maxEmbeddedAssetBytes" | "userDataPath">
 ): Promise<PackageAsset[]> => {
   const referencedAssetIds = new Set((list.items ?? [])
     .map((item) => item.assetId)
@@ -118,6 +134,7 @@ const collectPackageAssets = async (
   return Promise.all(assets.map(async (asset) => ({
     ...asset,
     file: await createAssetFileEntry(asset, {
+      fileSystem: options.fileSystem ?? defaultFileSystem,
       maxEmbeddedAssetBytes: options.maxEmbeddedAssetBytes ?? defaultMaxEmbeddedAssetBytes,
       userDataPath: options.userDataPath
     })
@@ -126,11 +143,14 @@ const collectPackageAssets = async (
 
 const createAssetFileEntry = async (
   asset: MediaAssetRecord,
-  options: { maxEmbeddedAssetBytes: number; userDataPath?: string }
+  options: { fileSystem: PackageAssetFileSystem; maxEmbeddedAssetBytes: number; userDataPath?: string }
 ): Promise<PackageAssetFile> => {
-  const sourcePathExists = await pathExists(asset.sourcePath);
+  const sourcePathExists = await pathExists(asset.sourcePath, options.fileSystem);
   const managedPath = options.userDataPath ? resolveManagedAssetPath(options.userDataPath, asset.managedRelPath) : undefined;
-  const managedPathExists = managedPath ? await pathExists(managedPath) : false;
+  const managedPathStatus: PackageAssetStatResult = managedPath
+    ? await statFile(managedPath, options.fileSystem)
+    : { exists: false };
+  const managedPathExists = managedPathStatus.exists;
   const baseEntry = {
     managedRelPath: asset.managedRelPath,
     managedPath,
@@ -148,7 +168,15 @@ const createAssetFileEntry = async (
     };
   }
 
-  if (!managedPathExists) {
+  if (!managedPathStatus.exists) {
+    if (managedPathStatus.error) {
+      return {
+        ...baseEntry,
+        kind: "local-reference",
+        reason: `Managed asset file could not be accessed at package export time: ${formatFileError(managedPathStatus.error)}.`
+      };
+    }
+
     return {
       ...baseEntry,
       kind: "local-reference",
@@ -156,7 +184,7 @@ const createAssetFileEntry = async (
     };
   }
 
-  const fileStat = await stat(managedPath);
+  const fileStat = managedPathStatus.stat;
   if (fileStat.size > options.maxEmbeddedAssetBytes) {
     return {
       ...baseEntry,
@@ -166,12 +194,24 @@ const createAssetFileEntry = async (
     };
   }
 
+  let contentBase64: string;
+  try {
+    contentBase64 = (await options.fileSystem.readFile(managedPath)).toString("base64");
+  } catch (caught) {
+    return {
+      ...baseEntry,
+      kind: "local-reference",
+      byteSize: fileStat.size,
+      reason: `Managed asset file could not be read at package export time: ${formatFileError(caught)}.`
+    };
+  }
+
   return {
     ...baseEntry,
     kind: "embedded",
     byteSize: fileStat.size,
     encoding: "base64",
-    contentBase64: (await readFile(managedPath)).toString("base64")
+    contentBase64
   };
 };
 
@@ -185,14 +225,29 @@ const resolveManagedAssetPath = (userDataPath: string, managedRelPath: string) =
   return candidate;
 };
 
-const pathExists = async (filePath: string) => {
+const pathExists = async (filePath: string, fileSystem: PackageAssetFileSystem) => {
+  const status = await statFile(filePath, fileSystem);
+  return status.exists;
+};
+
+const statFile = async (filePath: string, fileSystem: PackageAssetFileSystem): Promise<PackageAssetStatResult> => {
   try {
-    await stat(filePath);
-    return true;
+    return {
+      exists: true,
+      stat: await fileSystem.stat(filePath)
+    };
   } catch (caught) {
     if ((caught as NodeJS.ErrnoException).code === "ENOENT") {
-      return false;
+      return { exists: false };
     }
-    throw caught;
+    return {
+      exists: false,
+      error: caught
+    };
   }
+};
+
+const formatFileError = (caught: unknown) => {
+  const error = caught as NodeJS.ErrnoException;
+  return error.code ?? error.message ?? "unknown error";
 };
