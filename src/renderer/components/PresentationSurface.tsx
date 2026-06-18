@@ -11,7 +11,7 @@ type PresentationSurfaceProps = {
   selectedItem: EditorBoardItem | null;
   onDragStart: (event: DragEvent<HTMLElement>, itemId: string) => void;
   onDropItem: (event: DragEvent<HTMLElement>, target: EditorContainer) => void;
-  onMoveItem: (itemId: string, target: EditorContainer) => void;
+  onMoveItem: (itemId: string, target: EditorContainer) => Promise<void> | void;
   onSelectItem: (itemId: string) => void;
 };
 

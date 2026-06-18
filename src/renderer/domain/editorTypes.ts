@@ -34,6 +34,11 @@ export type EditorStore = {
   loadDashboard: () => Promise<DashboardState>;
   createBoard: (name: string) => Promise<string>;
   openBoard: (listId: string) => Promise<void>;
+  moveItems: (listId: string, itemIds: string[], targetRowId: string | null, targetIndex: number) => Promise<void>;
+  insertRow: (listId: string, label: string, color: string, afterRowId?: string) => Promise<void>;
+  updateRow: (rowId: string, patch: { label?: string; color?: string }) => Promise<void>;
+  reorderRows: (listId: string, rowIdsInOrder: string[]) => Promise<void>;
+  removeRow: (rowId: string) => Promise<void>;
 };
 
 export type ListWithItems = TierList & {

@@ -61,8 +61,12 @@ type EditorPageProps = {
   onSendSelectedToPool: () => void;
   onDragStart: (event: DragEvent<HTMLElement>, itemId: string) => void;
   onDropItem: (event: DragEvent<HTMLElement>, target: EditorContainer) => void;
-  onMoveItem: (itemId: string, target: EditorContainer) => void;
+  onMoveItem: (itemId: string, target: EditorContainer) => Promise<void> | void;
   onSelectItem: (itemId: string) => void;
+  onInsertRow: (afterRowId?: string) => Promise<void> | void;
+  onUpdateRow: (rowId: string, patch: { label: string; color: string }) => Promise<void> | void;
+  onReorderRows: (rowIdsInOrder: string[]) => Promise<void> | void;
+  onRemoveRow: (rowId: string) => Promise<void> | void;
 };
 
 export const EditorPage = ({
@@ -95,7 +99,11 @@ export const EditorPage = ({
   onDragStart,
   onDropItem,
   onMoveItem,
-  onSelectItem
+  onSelectItem,
+  onInsertRow,
+  onUpdateRow,
+  onReorderRows,
+  onRemoveRow
 }: EditorPageProps) => {
   if (mode === "presentation") {
     return (
@@ -181,10 +189,15 @@ export const EditorPage = ({
             board={board}
             selectedItemId={selectedItemId}
             selectedItem={selectedItem}
+            canEditRows
             onDragStart={onDragStart}
             onDropItem={onDropItem}
             onMoveItem={onMoveItem}
             onSelectItem={onSelectItem}
+            onInsertRow={onInsertRow}
+            onUpdateRow={onUpdateRow}
+            onReorderRows={onReorderRows}
+            onRemoveRow={onRemoveRow}
           />
           <ItemDock
             items={poolItems}

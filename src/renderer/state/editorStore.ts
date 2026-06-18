@@ -33,5 +33,20 @@ export const createEditorStore = (api: TierStudioApi): EditorStore => ({
 
     window.localStorage.setItem(activeListStorageKey, list.id);
     window.sessionStorage.setItem(activeListSessionKey, "open");
+  },
+  moveItems: async (listId: string, itemIds: string[], targetRowId: string | null, targetIndex: number) => {
+    await api.positions.move({ listId, itemIds, targetRowId, targetIndex });
+  },
+  insertRow: async (listId: string, label: string, color: string, afterRowId?: string) => {
+    await api.rows.insert(listId, { label, color, afterRowId });
+  },
+  updateRow: async (rowId: string, patch: { label?: string; color?: string }) => {
+    await api.rows.update(rowId, patch);
+  },
+  reorderRows: async (listId: string, rowIdsInOrder: string[]) => {
+    await api.rows.reorder(listId, rowIdsInOrder);
+  },
+  removeRow: async (rowId: string) => {
+    await api.rows.remove(rowId);
   }
 });

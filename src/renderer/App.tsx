@@ -106,19 +106,11 @@ const loadState = (): PersistedState | undefined => {
 
 const editorStore = createEditorStore(window.tierStudio);
 
-const loadBoard = async (listId: string, savedBoard?: EditorBoardState) => {
+const loadBoard = async (listId: string) => {
   await editorStore.openBoard(listId);
   const list = await window.tierStudio.lists.get(listId);
   if (!list) {
     throw new Error(`Tier list not found: ${listId}`);
-  }
-
-  if (savedBoard?.id === list.id) {
-    return {
-      ...savedBoard,
-      id: list.id,
-      name: list.name
-    };
   }
 
   return mapTierListToBoard(list);
@@ -163,7 +155,7 @@ export const App = () => {
     }
 
     let isMounted = true;
-    loadBoard(savedListId, saved?.board)
+    loadBoard(savedListId)
       .then((loadedBoard) => {
         if (isMounted) {
           setBoard(loadedBoard);
@@ -217,7 +209,14 @@ export const App = () => {
     }));
   };
 
-  const moveItem = (itemId: string, target: EditorContainer) => {
+  const moveItem = async (itemId: string, target: EditorContainer) => {
+    if (board.id) {
+      const targetIndex = board.items.filter((item) => item.container === target && item.id !== itemId).length;
+      await editorStore.moveItems(board.id, [itemId], target === "pool" ? null : target, targetIndex);
+      await refreshActiveBoard();
+      return;
+    }
+
     setBoard((current) => ({
       ...current,
       items: current.items.map((item) => (item.id === itemId ? { ...item, container: target } : item))
@@ -234,7 +233,7 @@ export const App = () => {
     event.preventDefault();
     const itemId = event.dataTransfer.getData("text/plain");
     if (itemId) {
-      moveItem(itemId, target);
+      void moveItem(itemId, target);
     }
   };
 
@@ -261,7 +260,74 @@ export const App = () => {
     if (!selectedItemId) {
       return;
     }
-    moveItem(selectedItemId, "pool");
+    void moveItem(selectedItemId, "pool");
+  };
+
+  const insertRow = async (afterRowId?: string) => {
+    if (board.id) {
+      await editorStore.insertRow(board.id, "New", "#64748b", afterRowId);
+      await refreshActiveBoard();
+      return;
+    }
+
+    setBoard((current) => {
+      const insertIndex = afterRowId ? current.tiers.findIndex((tier) => tier.id === afterRowId) + 1 : current.tiers.length;
+      const nextTier = { id: `row-${Date.now()}`, label: "New", color: "#64748b" };
+      return {
+        ...current,
+        tiers: [
+          ...current.tiers.slice(0, insertIndex),
+          nextTier,
+          ...current.tiers.slice(insertIndex)
+        ]
+      };
+    });
+  };
+
+  const updateRow = async (rowId: string, patch: { label: string; color: string }) => {
+    if (board.id) {
+      await editorStore.updateRow(rowId, patch);
+      await refreshActiveBoard();
+      return;
+    }
+
+    setBoard((current) => ({
+      ...current,
+      tiers: current.tiers.map((tier) => (tier.id === rowId ? { ...tier, ...patch } : tier))
+    }));
+  };
+
+  const reorderRows = async (rowIdsInOrder: string[]) => {
+    if (board.id) {
+      await editorStore.reorderRows(board.id, rowIdsInOrder);
+      await refreshActiveBoard();
+      return;
+    }
+
+    setBoard((current) => ({
+      ...current,
+      tiers: rowIdsInOrder
+        .map((rowId) => current.tiers.find((tier) => tier.id === rowId))
+        .filter((tier): tier is EditorTier => Boolean(tier))
+    }));
+  };
+
+  const removeRow = async (rowId: string) => {
+    if (board.tiers.length <= 1) {
+      return;
+    }
+
+    if (board.id) {
+      await editorStore.removeRow(rowId);
+      await refreshActiveBoard();
+      return;
+    }
+
+    setBoard((current) => ({
+      ...current,
+      tiers: current.tiers.filter((tier) => tier.id !== rowId),
+      items: current.items.map((item) => (item.container === rowId ? { ...item, container: "pool" } : item))
+    }));
   };
 
   const exportPresentation = async () => {
@@ -342,6 +408,10 @@ export const App = () => {
         onDropItem={onDropItem}
         onMoveItem={moveItem}
         onSelectItem={setSelectedItemId}
+        onInsertRow={insertRow}
+        onUpdateRow={updateRow}
+        onReorderRows={reorderRows}
+        onRemoveRow={removeRow}
       />
     </main>
   );

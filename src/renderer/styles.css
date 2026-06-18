@@ -530,9 +530,41 @@ button {
 .tier-label {
   display: grid;
   place-items: center;
+  align-content: center;
+  gap: 6px;
   font-size: 1.1rem;
   font-weight: 800;
   color: #fff;
+  padding: 8px;
+}
+
+.row-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  width: 100%;
+}
+
+.row-control {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  border-radius: 6px;
+  background: rgba(2, 6, 23, 0.36);
+  color: #f8fafc;
+  cursor: pointer;
+  font-size: 0.56rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 5px 3px;
+}
+
+.row-control:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.tier-row.sorting {
+  opacity: 0.72;
 }
 
 .tier-items {
@@ -717,6 +749,21 @@ button {
   color: #f8fafc;
   padding: 10px 12px;
   font: inherit;
+}
+
+.modal-body input {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.68);
+  color: #f8fafc;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.modal-body input[type="color"] {
+  height: 42px;
+  padding: 4px;
 }
 
 .media-import-panel {
