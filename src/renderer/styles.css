@@ -234,14 +234,18 @@ button {
 }
 
 .sidebar,
+.editor-page,
 .workspace,
 .inspector,
+.metadata-strip,
+.bottom-rail,
 .settings-page {
   min-width: 0;
 }
 
 .app-shell > .sidebar,
 .app-shell > .inspector,
+.metadata-strip,
 .settings-page,
 .panel,
 .board-stage {
@@ -252,7 +256,56 @@ button {
 }
 
 .app-shell:not(.presentation) {
-  grid-template-columns: 284px minmax(0, 1fr) 304px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.editor-page {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 304px;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 12px;
+  min-height: calc(100vh - 28px);
+}
+
+.editor-page > .topbar,
+.editor-page > .bottom-rail,
+.settings-page {
+  grid-column: 1 / -1;
+}
+
+.metadata-strip {
+  grid-column: 1;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+}
+
+.editor-page > .board-stage {
+  grid-column: 1;
+  grid-row: 3;
+}
+
+.editor-page > .pool-strip {
+  grid-column: 2;
+  grid-row: 2 / 4;
+  margin-bottom: 0;
+}
+
+.bottom-rail {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(180px, 220px) minmax(220px, 260px);
+  gap: 12px;
+}
+
+.bottom-rail .panel {
+  margin-bottom: 0;
+}
+
+.bottom-rail .template-list {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
 .presentation .sidebar,
@@ -421,7 +474,8 @@ button {
   min-height: 0;
 }
 
-.board-head {
+.board-head,
+.metadata-strip {
   display: flex;
   align-items: end;
   justify-content: space-between;
@@ -602,6 +656,21 @@ button {
 
 @media (max-width: 1180px) {
   .app-shell:not(.presentation) {
+    grid-template-columns: 1fr;
+  }
+
+  .editor-page {
+    grid-template-columns: 1fr;
+  }
+
+  .editor-page > .board-stage,
+  .editor-page > .pool-strip,
+  .metadata-strip {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .bottom-rail {
     grid-template-columns: 1fr;
   }
 

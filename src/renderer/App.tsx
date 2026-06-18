@@ -4,6 +4,7 @@ import { toPng } from "html-to-image";
 import { mapTierListToBoard } from "./domain/editorMappers";
 import type { EditorBoardState, EditorContainer, EditorMode, EditorScreen, EditorTier } from "./domain/editorTypes";
 import { DashboardPage } from "./pages/DashboardPage";
+import { EditorPage } from "./pages/EditorPage";
 import { activeListSessionKey, activeListStorageKey, createEditorStore } from "./state/editorStore";
 
 type Template = {
@@ -89,16 +90,6 @@ const waitForPaint = () =>
   });
 
 const toExportFileName = (name: string) => `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "tier-list"}.png`;
-
-const itemFontSize = (label: string) => {
-  if (label.length > 16) {
-    return "0.56rem";
-  }
-  if (label.length > 10) {
-    return "0.62rem";
-  }
-  return "0.68rem";
-};
 
 const loadState = (): PersistedState | undefined => {
   const raw = localStorage.getItem("tier-list-studio-state");
@@ -316,241 +307,41 @@ export const App = () => {
   }
 
   const poolItems = board.items.filter((item) => item.container === "pool");
-  const visibleScreen = mode === "presentation" ? "board" : screen;
 
   return (
     <main
       className={`app-shell ${mode === "presentation" ? "presentation" : ""} theme-${activeTheme.name.toLowerCase()}`}
       style={{ ["--theme-accent" as string]: activeTheme.accent, ["--theme-bg" as string]: activeTheme.background }}
     >
-      {mode === "build" ? <header className="topbar">
-        <div className="topbar-left">
-          <div className="brand-inline">
-            <span className="brand-mark" />
-            <span className="brand-name">Tier List Studio</span>
-          </div>
-          <button className={`menu-button ${screen === "board" ? "active" : ""}`} onClick={() => setScreen("board")}>Board</button>
-          <button className={`menu-button ${screen === "settings" ? "active" : ""}`} onClick={() => setScreen("settings")}>Settings</button>
-        </div>
-
-        <div className="mode-switch">
-          <button className="active" onClick={() => setMode("build")}>Build</button>
-          <button onClick={() => setMode("presentation")}>Presentation</button>
-        </div>
-
-        <div className="topbar-right">
-          <button className="icon-button" aria-label="Undo">↶</button>
-          <button className="icon-button" aria-label="Redo">↷</button>
-          <button className="primary" onClick={exportPresentation}>Export</button>
-          {screen === "board" ? (
-            <>
-              <button className="icon-button" aria-label="New item" onClick={addPoolItem}>+</button>
-              <button className="primary" onClick={duplicateBoard}>Duplicate</button>
-            </>
-          ) : null}
-        </div>
-      </header> : null}
-
-      {visibleScreen === "board" ? (
-        <>
-          {mode === "build" ? (
-            <aside className="sidebar">
-              <section className="panel">
-                <div className="panel-head">
-                  <span className="panel-title">Templates</span>
-                  <button className="icon-button" aria-label="New template" onClick={createTemplateFromBoard}>+</button>
-                </div>
-                <div className="template-list">
-                  {templates.map((template) => (
-                      <button
-                        key={template.name}
-                        className="template-card"
-                        style={{ ["--accent" as string]: template.accent }}
-                      onClick={() => resetBoard(template)}
-                    >
-                      <span className="template-name">{template.name}</span>
-                      <span className="template-bar" />
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              <section className="panel">
-                <div className="panel-head">
-                  <span className="panel-title">Theme</span>
-                  <span className="panel-chip">{activeTheme.name}</span>
-                </div>
-                <div className="swatch-row">
-                  {themes.map((theme, index) => (
-                    <button
-                      key={theme.name}
-                      className={`swatch ${index === activeThemeIndex ? "active" : ""}`}
-                      style={{ backgroundColor: theme.accent }}
-                      aria-label={theme.name}
-                      onClick={() => setActiveThemeIndex(index)}
-                    />
-                  ))}
-                </div>
-              </section>
-            </aside>
-          ) : null}
-
-          <section className="workspace presentation-export-surface">
-            <section className="board-stage">
-              {mode === "build" ? <div className="board-head">
-                <div className="title-stack">
-                  <div className="eyebrow">Board</div>
-                  <h1>{board.name}</h1>
-                </div>
-                <div className="board-chips">
-                  <span className="pill active">{selectedItem ? selectedItem.label : "Ready"}</span>
-                  <span className="pill">{poolItems.length} pool</span>
-                  <span className="pill">{board.tiers.length} rows</span>
-                  {selectedItem ? <button className="pill-button" onClick={sendSelectedToPool}>Pool</button> : null}
-                </div>
-              </div> : null}
-
-              <div className="board">
-                {board.tiers.map((tier) => {
-                  const tierItems = board.items.filter((item) => item.container === tier.id);
-                  return (
-                    <div
-                      key={tier.id}
-                      className={`tier-row ${selectedItem ? "targetable" : ""}`}
-                      tabIndex={0}
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={(event) => onDropItem(event, tier.id)}
-                      onClick={() => selectedItem && moveItem(selectedItem.id, tier.id)}
-                      onKeyDown={(event) => {
-                        if (selectedItem && (event.key === "Enter" || event.key === " ")) {
-                          event.preventDefault();
-                          moveItem(selectedItem.id, tier.id);
-                        }
-                      }}
-                    >
-                      <div className="tier-label" style={{ backgroundColor: tier.color }}>
-                        {tier.label}
-                      </div>
-                      <div className="tier-items">
-                        {tierItems.map((item) => (
-                          <button
-                            key={item.id}
-                            className={`item-chip placed ${selectedItemId === item.id ? "selected" : ""}`}
-                            style={{ fontSize: itemFontSize(item.label) }}
-                            draggable
-                            onDragStart={(event) => onDragStart(event, item.id)}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setSelectedItemId(item.id);
-                            }}
-                          >
-                            {item.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className="panel pool-strip" onDragOver={(event) => event.preventDefault()} onDrop={(event) => onDropItem(event, "pool")}>
-              {mode === "build" ? <div className="panel-head">
-                <span className="panel-title">Pool</span>
-                <span className="panel-chip">{poolItems.length}</span>
-              </div> : null}
-              <div className="pool-grid">
-                {poolItems.map((item) => (
-                  <button
-                    key={item.id}
-                    className={`item-chip ${selectedItemId === item.id ? "selected" : ""}`}
-                    style={{ fontSize: itemFontSize(item.label) }}
-                    draggable
-                    onDragStart={(event) => onDragStart(event, item.id)}
-                    onClick={() => setSelectedItemId(item.id)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </section>
-          </section>
-
-          {mode === "build" ? (
-            <aside className="inspector">
-              <section className="panel">
-                <div className="panel-head">
-                  <span className="panel-title">Effects</span>
-                  <span className="panel-chip">Active</span>
-                </div>
-                <div className="toggle-grid">
-                  <div className="toggle-row">
-                    <span>Glow</span>
-                    <button className={`switch ${effects.glow ? "active" : ""}`} onClick={() => toggleEffect("glow")} aria-label="Glow" />
-                  </div>
-                  <div className="toggle-row">
-                    <span>Shake</span>
-                    <button className={`switch ${effects.shake ? "active" : ""}`} onClick={() => toggleEffect("shake")} aria-label="Shake" />
-                  </div>
-                  <div className="toggle-row">
-                    <span>Confetti</span>
-                    <button className={`switch ${effects.confetti ? "active" : ""}`} onClick={() => toggleEffect("confetti")} aria-label="Confetti" />
-                  </div>
-                </div>
-              </section>
-            </aside>
-          ) : null}
-        </>
-      ) : (
-        <section className="settings-page">
-          <section className="panel">
-            <div className="panel-head">
-              <span className="panel-title">General</span>
-              <span className="panel-chip">Settings</span>
-            </div>
-            <div className="settings-grid">
-              <div className="setting-row">
-                <span>Default board</span>
-                <button className="pill-button">Launch Week</button>
-              </div>
-              <div className="setting-row">
-                <span>Theme</span>
-                <button className="pill-button">{activeTheme.name}</button>
-              </div>
-              <div className="setting-row">
-                <span>Presentation</span>
-                <button
-                  className={`pill-button ${mode === "presentation" ? "active" : ""}`}
-                  onClick={() => {
-                    setScreen("board");
-                    setMode("presentation");
-                  }}
-                >
-                  Enabled
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <section className="panel">
-            <div className="panel-head">
-              <span className="panel-title">AI</span>
-              <span className="panel-chip">Settings</span>
-            </div>
-            <div className="provider-list">
-              {providers.map((provider) => (
-                <div className="provider-card" key={provider.name}>
-                  <div>
-                    <div className="provider-name">{provider.name}</div>
-                    <div className="provider-state">{provider.configured ? "Configured" : "Disabled"}</div>
-                  </div>
-                  <button className={`switch ${provider.enabled ? "active" : ""}`} onClick={() => toggleProvider(provider.name)} aria-label={provider.name} />
-                </div>
-              ))}
-            </div>
-          </section>
-        </section>
-      )}
+      <EditorPage
+        board={board}
+        screen={screen}
+        mode={mode}
+        templates={templates}
+        themes={themes}
+        activeThemeIndex={activeThemeIndex}
+        activeTheme={activeTheme}
+        providers={providers}
+        effects={effects}
+        selectedItemId={selectedItemId}
+        selectedItem={selectedItem}
+        poolItems={poolItems}
+        onSetScreen={setScreen}
+        onSetMode={setMode}
+        onExportPresentation={exportPresentation}
+        onAddPoolItem={addPoolItem}
+        onDuplicateBoard={duplicateBoard}
+        onCreateTemplate={createTemplateFromBoard}
+        onResetBoard={resetBoard}
+        onSetActiveThemeIndex={setActiveThemeIndex}
+        onToggleEffect={toggleEffect}
+        onToggleProvider={toggleProvider}
+        onSendSelectedToPool={sendSelectedToPool}
+        onDragStart={onDragStart}
+        onDropItem={onDropItem}
+        onMoveItem={moveItem}
+        onSelectItem={setSelectedItemId}
+      />
     </main>
   );
 };
