@@ -16,7 +16,9 @@ export const createEditorStore = (api: TierStudioApi): EditorStore => ({
     };
   },
   createBoard: async (name: string) => {
-    const workspace = await api.workspaces.create({ name: "Tier List Studio" });
+    const workspaces = await api.workspaces.list();
+    const workspace = workspaces.find((candidate) => candidate.name === "Tier List Studio")
+      ?? await api.workspaces.create({ name: "Tier List Studio" });
     const list = await api.lists.create({ workspaceId: workspace.id, name });
 
     return list.id;

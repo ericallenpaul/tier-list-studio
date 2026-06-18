@@ -52,6 +52,15 @@ export const DashboardPage = ({ store, onOpenBoard }: DashboardPageProps) => {
     }
   };
 
+  const openRecentBoard = async (listId: string) => {
+    try {
+      setError(null);
+      await onOpenBoard(listId);
+    } catch (openError) {
+      setError(openError instanceof Error ? openError.message : "Unable to open board.");
+    }
+  };
+
   return (
     <main className="dashboard-shell">
       <header className="dashboard-topbar">
@@ -87,7 +96,7 @@ export const DashboardPage = ({ store, onOpenBoard }: DashboardPageProps) => {
 
         <section className="dashboard-list" aria-label="Recent boards">
           {dashboard.recentLists.map((list) => (
-            <button className="dashboard-list-item" key={list.id} onClick={() => onOpenBoard(list.id)}>
+            <button className="dashboard-list-item" key={list.id} onClick={() => void openRecentBoard(list.id)}>
               <span>{list.name}</span>
               <span>{dashboard.workspaces.find((workspace) => workspace.id === list.workspaceId)?.name ?? "Workspace"}</span>
             </button>

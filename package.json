@@ -11,7 +11,7 @@
     "build": "tsc --noEmit && vite build && corepack pnpm run build:electron",
     "build:electron": "node -e \"fs.rmSync('dist/main',{recursive:true,force:true});fs.rmSync('dist/preload',{recursive:true,force:true})\" && tsc --target ES2022 --module NodeNext --moduleResolution NodeNext --strict --skipLibCheck --esModuleInterop --types node --outDir dist --rootDir src src/main/index.ts && node scripts/copy-db-schema.mjs && esbuild src/preload/index.cts --bundle --platform=node --format=cjs --target=es2022 --outfile=dist/preload/index.cjs --external:electron",
     "test": "vitest run --passWithNoTests",
-    "test:e2e": "playwright test --workers=1 --pass-with-no-tests",
+    "test:e2e": "node scripts/run-e2e.mjs",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "package:win": "corepack pnpm run build && electron-builder --win nsis"

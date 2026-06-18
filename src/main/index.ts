@@ -4,7 +4,10 @@ import { registerHandlers } from "./ipc/registerHandlers.js";
 import { createMainWindow } from "./windows/createMainWindow.js";
 
 const testUserDataPath = process.env.TIER_LIST_STUDIO_USER_DATA;
-if (testUserDataPath) {
+const canUseTestUserDataPath = !app.isPackaged
+  && (process.env.NODE_ENV === "test" || process.env.ELECTRON_DISABLE_SECURITY_WARNINGS === "true");
+
+if (testUserDataPath && canUseTestUserDataPath) {
   app.setPath("userData", testUserDataPath);
 }
 

@@ -1,26 +1,10 @@
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
-import { execSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const require = createRequire(import.meta.url);
-const betterSqliteBuild = resolve(dirname(require.resolve("better-sqlite3/package.json")), "build");
-
-const runBuild = () => {
-  execSync("corepack pnpm run build", {
-    cwd: projectRoot,
-    stdio: "inherit"
-  });
-  rmSync(betterSqliteBuild, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 });
-  execSync("corepack pnpm exec electron-builder install-app-deps", {
-    cwd: projectRoot,
-    stdio: "inherit"
-  });
-};
 
 test.describe("dashboard editor flow", () => {
   let app: ElectronApplication | undefined;
@@ -29,7 +13,6 @@ test.describe("dashboard editor flow", () => {
 
   test.beforeAll(async () => {
     test.setTimeout(60_000);
-    runBuild();
     userDataDir = mkdtempSync(join(tmpdir(), "tier-list-studio-e2e-"));
 
     app = await electron.launch({
