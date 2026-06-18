@@ -124,6 +124,30 @@ test.describe("item dock flow", () => {
     await expect.poll(() => poolLabelsFromPersistedBoard(page)).toEqual(["Beta", "Gamma", "Alpha"]);
   });
 
+  test("appends local-board checked placed items after existing pool items when sending to pool", async () => {
+    await createBoard(page, "Dock Local Append");
+    await page.getByRole("button", { name: "Launch Week" }).click();
+    await expect(page.getByRole("heading", { name: "Launch Week" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Ramen" }).click();
+    await page.locator(".tier-row").first().press("Enter");
+    await expect(page.locator(".tier-row").first().getByRole("button", { name: "Ramen" })).toBeVisible();
+
+    await page.getByLabel("Select Ramen").check();
+    await page.getByRole("button", { name: "Send to pool" }).click();
+
+    await expect.poll(() => poolLabelsFromPersistedBoard(page)).toEqual([
+      "Coffee",
+      "Camera",
+      "Headphones",
+      "Notebook",
+      "Desk Lamp",
+      "Microphone",
+      "Mouse",
+      "Ramen"
+    ]);
+  });
+
   test("shows bulk action failures", async () => {
     await createBoardWithItems(page, "Dock Failure", ["Pizza"]);
     await page.getByRole("button", { name: "Pizza" }).click();
@@ -142,8 +166,15 @@ test.describe("item dock flow", () => {
     await expect(page.getByText("Move failed by test")).toBeVisible();
   });
 
-  test("presentation mode hides item dock controls and inspector", async () => {
-    await createBoardWithItems(page, "Dock Presentation", ["Pizza"]);
+  test("presentation mode preserves pool order while hiding item dock controls and inspector", async () => {
+    await createBoardWithItems(page, "Dock Presentation", ["Alpha", "Beta", "Gamma"]);
+    await page.getByRole("button", { name: "Alpha" }).click();
+    await page.locator(".tier-row").first().press("Enter");
+    await expect(page.locator(".tier-row").first().getByRole("button", { name: "Alpha" })).toBeVisible();
+
+    await page.getByLabel("Select Alpha").check();
+    await page.getByRole("button", { name: "Send to pool" }).click();
+    await expect.poll(() => poolLabelsFromPersistedBoard(page)).toEqual(["Beta", "Gamma", "Alpha"]);
 
     await page.getByRole("button", { name: "Presentation" }).click();
 
@@ -152,5 +183,7 @@ test.describe("item dock flow", () => {
     await expect(page.getByLabel("Item inspector")).toBeHidden();
     await expect(page.getByRole("button", { name: "Send to pool" })).toBeHidden();
     await expect(page.getByText("Select an item to edit it.")).toBeHidden();
+    await expect(page.getByTestId("presentation-surface").getByTestId("item-dock").locator(".item-chip"))
+      .toHaveText(["Beta", "Gamma", "Alpha"]);
   });
 });

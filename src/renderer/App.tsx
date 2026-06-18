@@ -6,6 +6,7 @@ import type { EditorBoardItem, EditorBoardState, EditorContainer, EditorMode, Ed
 import { DashboardPage } from "./pages/DashboardPage";
 import { EditorPage } from "./pages/EditorPage";
 import { activeListSessionKey, activeListStorageKey, createEditorStore } from "./state/editorStore";
+import { loadPersistedState, type PersistedState } from "./state/persistedState";
 
 type Template = {
   name: string;
@@ -24,17 +25,6 @@ type ProviderState = {
   name: string;
   configured: boolean;
   enabled: boolean;
-};
-
-type PersistedState = {
-  screen?: EditorScreen;
-  mode?: EditorMode;
-  selectedItemId?: string | null;
-  selectedItemIds?: string[];
-  activeThemeIndex?: number;
-  board?: EditorBoardState;
-  providers?: ProviderState[];
-  effects?: { glow: boolean; shake: boolean; confetti: boolean };
 };
 
 const initialTemplates: Template[] = [
@@ -100,18 +90,7 @@ const waitForPaint = () =>
 
 const toExportFileName = (name: string) => `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "tier-list"}.png`;
 
-const loadState = (): PersistedState | undefined => {
-  const raw = localStorage.getItem("tier-list-studio-state");
-  if (!raw) {
-    return undefined;
-  }
-
-  try {
-    return JSON.parse(raw) as PersistedState;
-  } catch {
-    return undefined;
-  }
-};
+const loadState = (): PersistedState | undefined => loadPersistedState();
 
 const editorStore = createEditorStore(window.tierStudio);
 
@@ -123,6 +102,24 @@ const loadBoard = async (listId: string) => {
   }
 
   return mapTierListToBoard(list);
+};
+
+const moveLocalItemsToPool = (current: EditorBoardState, itemIds: string[]): EditorBoardState => {
+  const targetIds = new Set(itemIds);
+  const movedItems = itemIds
+    .map((itemId) => current.items.find((item) => item.id === itemId))
+    .filter((item): item is EditorBoardItem => Boolean(item));
+  const remainingItems = current.items.filter((item) => !targetIds.has(item.id));
+  const now = new Date().toISOString();
+
+  return {
+    ...current,
+    items: [
+      ...remainingItems.filter((item) => item.container === "pool"),
+      ...movedItems.map((item) => ({ ...item, container: "pool" as const, updatedAt: now })),
+      ...remainingItems.filter((item) => item.container !== "pool")
+    ]
+  };
 };
 
 export const App = () => {
@@ -237,10 +234,12 @@ export const App = () => {
       return;
     }
 
-    setBoard((current) => ({
-      ...current,
-      items: current.items.map((item) => (item.id === itemId ? { ...item, container: target } : item))
-    }));
+    setBoard((current) => target === "pool"
+      ? moveLocalItemsToPool(current, [itemId])
+      : {
+          ...current,
+          items: current.items.map((item) => (item.id === itemId ? { ...item, container: target, updatedAt: new Date().toISOString() } : item))
+        });
     setSelectedItemId(null);
   };
 
@@ -310,10 +309,7 @@ export const App = () => {
       return;
     }
 
-    setBoard((current) => ({
-      ...current,
-      items: current.items.map((item) => (itemIds.includes(item.id) ? { ...item, container: "pool" } : item))
-    }));
+    setBoard((current) => moveLocalItemsToPool(current, itemIds));
     setSelectedItemIds([]);
     setSelectedItemId(null);
   };

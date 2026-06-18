@@ -55,18 +55,21 @@ export const ItemDock = ({
   const selectedItems = useMemo(() => items.filter((item) => selectedIds.has(item.id)), [items, selectedIds]);
   const filteredItems = useMemo(() => {
     const cleanFilter = filter.trim().toLowerCase();
-    return [...items]
-      .filter((item) => item.label.toLowerCase().includes(cleanFilter))
-      .sort((left, right) => {
-        if (sortMode === "date") {
-          return right.createdAt.localeCompare(left.createdAt) || left.label.localeCompare(right.label);
-        }
-        if (sortMode === "kind") {
-          return left.kind.localeCompare(right.kind) || left.label.localeCompare(right.label);
-        }
-        return left.label.localeCompare(right.label);
-      });
-  }, [filter, items, sortMode]);
+    const visibleItems = items.filter((item) => item.label.toLowerCase().includes(cleanFilter));
+    if (!showControls) {
+      return visibleItems;
+    }
+
+    return [...visibleItems].sort((left, right) => {
+      if (sortMode === "date") {
+        return right.createdAt.localeCompare(left.createdAt) || left.label.localeCompare(right.label);
+      }
+      if (sortMode === "kind") {
+        return left.kind.localeCompare(right.kind) || left.label.localeCompare(right.label);
+      }
+      return left.label.localeCompare(right.label);
+    });
+  }, [filter, items, showControls, sortMode]);
   const selectedCount = selectedItemIds.length;
   const hasSelectedNonText = selectedItems.some((item) => item.kind !== "text");
   const hasSelectedPlacedItem = selectedItems.some((item) => item.container !== "pool");
