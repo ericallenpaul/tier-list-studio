@@ -161,6 +161,15 @@ describe("representative IPC input schemas", () => {
     });
   });
 
+  it("rejects renderer-controlled export image file paths", () => {
+    expect(() =>
+      renderImageInputSchema.parse({
+        listId: "list-1",
+        filePath: "C:\\tmp\\outside.png"
+      })
+    ).toThrow();
+  });
+
   it("parses AI item generation payloads with defaults", () => {
     expect(
       aiGenerateItemsInputSchema.parse({
@@ -227,6 +236,7 @@ describe("preload API builder", () => {
     await api.items.update("item-1", { label: "Updated" });
     await api.items.remove("item-1");
     await api.items.search({ text: "query" });
+    await api.assets.getMediaDataUrl("asset-1");
     await api.positions.move({ listId: "list-1", itemIds: ["item-1"], targetRowId: "row-1", targetIndex: 0 });
     await api.positions.normalize("list-1");
     await api.templates.list();

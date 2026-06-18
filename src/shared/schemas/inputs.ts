@@ -79,7 +79,8 @@ export const positionMoveInputSchema = z.object({
 
 export const renderImageInputSchema = z.object({
   listId: idSchema,
-  filePath: filePathSchema.optional(),
+  fileName: nonEmptyStringSchema.optional(),
+  imageDataUrl: z.string().trim().startsWith("data:image/").optional(),
   format: z.enum(["png", "jpg", "webp"]).default("png"),
   scale: z.number().min(0.25).max(4).default(1),
   width: positiveIntegerSchema.optional(),
@@ -123,7 +124,8 @@ export const settingsUpdateInputSchema = z
     ai: z
       .object({
         preferredProviderId: idSchema.optional(),
-        enabled: z.boolean().optional()
+        enabled: z.boolean().optional(),
+        openAiApiKey: z.string().trim().optional()
       })
       .strict()
       .optional()

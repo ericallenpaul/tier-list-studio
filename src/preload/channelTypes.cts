@@ -33,6 +33,9 @@ export const tierStudioChannels = {
     remove: "items:remove",
     search: "items:search"
   },
+  assets: {
+    getMediaDataUrl: "assets:getMediaDataUrl"
+  },
   positions: {
     move: "positions:move",
     normalize: "positions:normalize"

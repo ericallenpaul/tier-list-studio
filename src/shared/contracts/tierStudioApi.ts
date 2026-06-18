@@ -6,6 +6,7 @@ import type {
   ItemUpdateInput,
   ListCreateInput,
   ListUpdateInput,
+  ManagedAssetPreview,
   OpenFilesOptions,
   OpenFilesResult,
   PositionMoveInput,
@@ -14,6 +15,7 @@ import type {
   RowUpdateInput,
   SaveFileOptions,
   SaveFileResult,
+  TierListDetail,
   SettingsUpdateInput,
   TierStudioDomainResults,
   WorkspaceCreateInput,
@@ -37,7 +39,7 @@ export interface TierStudioApi {
   };
   lists: {
     list: (workspaceId: string) => Promise<TierList[]>;
-    get: (id: string) => Promise<TierList | undefined>;
+    get: (id: string) => Promise<TierListDetail | undefined>;
     create: (input: ListCreateInput) => Promise<TierList>;
     update: (id: string, patch: ListUpdateInput) => Promise<TierList>;
     duplicate: (id: string) => Promise<TierList>;
@@ -55,6 +57,9 @@ export interface TierStudioApi {
     update: (itemId: string, patch: ItemUpdateInput) => Promise<TierItem>;
     remove: (itemId: string) => Promise<void>;
     search: (query: ItemSearchInput) => Promise<TierItem[]>;
+  };
+  assets: {
+    getMediaDataUrl: (assetId: string) => Promise<ManagedAssetPreview>;
   };
   positions: {
     move: (input: PositionMoveInput) => Promise<TierPosition[]>;

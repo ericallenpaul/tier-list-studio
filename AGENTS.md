@@ -25,6 +25,10 @@ Use pnpm through Corepack if a local pnpm shim is unavailable.
 - `pnpm run lint`: run lightweight static validation.
 - `pnpm run typecheck`: run TypeScript without emitting files.
 - `pnpm run package:win`: build and package an unsigned Windows NSIS installer.
+- `pnpm run package:mac`: build and package a local macOS DMG on macOS.
+- `pnpm run package:mac:x64`: build a local macOS x64 DMG on macOS.
+- `pnpm run package:mac:arm64`: build a local macOS arm64 DMG on macOS.
+- `pnpm run package:linux`: build and package a local Linux AppImage on Linux.
 
 Do not add undocumented scripts. List contributor-facing scripts here or in the README.
 

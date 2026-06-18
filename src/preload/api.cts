@@ -36,6 +36,9 @@ export const createTierStudioApi = (invoke: IpcInvoke): TierStudioApi => ({
     remove: (itemId) => invoke(tierStudioChannels.items.remove, { itemId }),
     search: (query) => invoke(tierStudioChannels.items.search, query)
   },
+  assets: {
+    getMediaDataUrl: (assetId) => invoke(tierStudioChannels.assets.getMediaDataUrl, { id: assetId })
+  },
   positions: {
     move: (input) => invoke(tierStudioChannels.positions.move, input),
     normalize: (listId) => invoke(tierStudioChannels.positions.normalize, { listId })

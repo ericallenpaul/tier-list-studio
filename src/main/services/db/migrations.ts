@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { starterTemplates } from "../../../shared/templates/starterTemplates.js";
 import type { SqliteDatabase } from "./connection.js";
 
 const migrationId = 1;
@@ -119,37 +120,3 @@ export const seedDatabase = (db: SqliteDatabase) => {
 
   seed();
 };
-
-const starterTemplates = [
-  {
-    id: "template-classic-ranking",
-    name: "Classic Ranking",
-    description: "S through D rows for general rankings.",
-    category: "General",
-    definition: {
-      rows: [
-        { label: "S", fillColor: "#ef4444", textColor: "#ffffff" },
-        { label: "A", fillColor: "#f97316", textColor: "#111827" },
-        { label: "B", fillColor: "#eab308", textColor: "#111827" },
-        { label: "C", fillColor: "#22c55e", textColor: "#111827" },
-        { label: "D", fillColor: "#3b82f6", textColor: "#ffffff" }
-      ],
-      styles: {}
-    }
-  },
-  {
-    id: "template-simple-priority",
-    name: "Simple Priority",
-    description: "High, medium, low, and backlog rows.",
-    category: "Planning",
-    definition: {
-      rows: [
-        { label: "High", fillColor: "#dc2626", textColor: "#ffffff" },
-        { label: "Medium", fillColor: "#f59e0b", textColor: "#111827" },
-        { label: "Low", fillColor: "#16a34a", textColor: "#ffffff" },
-        { label: "Backlog", fillColor: "#64748b", textColor: "#ffffff" }
-      ],
-      styles: {}
-    }
-  }
-] as const;

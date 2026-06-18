@@ -2,6 +2,7 @@ appId: com.tierliststudio.app
 productName: Tier List Studio
 directories:
   output: release
+publish: null
 files:
   - dist/**
   - package.json
@@ -12,7 +13,6 @@ win:
     - target: nsis
       arch:
         - x64
-  signAndEditExecutable: false
   requestedExecutionLevel: asInvoker
 nsis:
   oneClick: false

@@ -1,3 +1,8 @@
+import { createHash, randomUUID } from "node:crypto";
+import { constants, createReadStream } from "node:fs";
+import { copyFile, mkdir, open, rename, stat, unlink } from "node:fs/promises";
+import { basename, extname, join } from "node:path";
+
 import type { TierStudioServices } from "../../../shared/contracts/tierStudioApi.js";
 import type { TierItem, TierItemKind, TierList, TierRow, Workspace } from "../../../shared/models/entities.js";
 import type {
@@ -12,6 +17,7 @@ import type {
 } from "../../../shared/schemas/inputs.js";
 import type { SqliteDatabase } from "../db/connection.js";
 import {
+  AssetRepository,
   ItemRepository,
   ListRepository,
   PositionRepository,
@@ -20,7 +26,7 @@ import {
   WorkspaceRepository
 } from "../repositories/index.js";
 import type { ItemRecord, JsonObject, JsonValue, TierListRecord, TierRowRecord, WorkspaceRecord } from "../repositories/types.js";
-import { createPositionService } from "../positions/positionService.js";
+import { createPositionService, mapPosition } from "../positions/positionService.js";
 
 const defaultRows = [
   { label: "S", fillColor: "#ef4444", textColor: "#ffffff" },
@@ -32,14 +38,20 @@ const defaultRows = [
 
 export type CoreListServices = Pick<TierStudioServices, "workspaces" | "lists" | "rows" | "items" | "positions">;
 
-export const createCoreListServices = (db: SqliteDatabase): CoreListServices => {
+type CoreListServiceOptions = {
+  userDataPath?: string;
+};
+
+export const createCoreListServices = (db: SqliteDatabase, options: CoreListServiceOptions = {}): CoreListServices => {
   const workspaces = new WorkspaceRepository(db);
   const lists = new ListRepository(db);
   const rows = new RowRepository(db);
   const items = new ItemRepository(db);
   const positions = new PositionRepository(db);
+  const assets = new AssetRepository(db);
   const search = new SearchRepository(db);
   const positionService = createPositionService(db);
+  const userDataPath = options.userDataPath ?? process.cwd();
 
   const syncListSearch = (list: TierListRecord) => {
     search.replace({
@@ -228,7 +240,14 @@ export const createCoreListServices = (db: SqliteDatabase): CoreListServices => 
       list: (workspaceId: string) => lists.listByWorkspace(workspaceId).map(mapList),
       get: (id: string) => {
         const list = lists.get(id);
-        return list ? mapList(list) : undefined;
+        return list
+          ? {
+              ...mapList(list),
+              rows: rows.listByTierList(id).map(mapRow),
+              items: items.listByTierList(id).map(mapItem),
+              positions: positions.listByTierList(id).map(mapPosition)
+            }
+          : undefined;
       },
       create: createList,
       update: updateList,
@@ -313,8 +332,53 @@ export const createCoreListServices = (db: SqliteDatabase): CoreListServices => 
         });
         return created().map(mapItem);
       },
-      importAssets: () => {
-        throw new Error("Asset import is not implemented yet.");
+      importAssets: async (listId: string, filePaths: string[]) => {
+        if (!lists.get(listId)) {
+          throw new Error(`Tier list not found: ${listId}`);
+        }
+
+        const mediaFiles: InspectedMediaFile[] = [];
+        for (const filePath of filePaths) {
+          mediaFiles.push(await stageManagedAsset(filePath, userDataPath));
+        }
+
+        const imported = db.transaction(() => {
+          const startOrder = maxSortOrder(db, listId, null) + 1;
+          return mediaFiles.map((media, index) => {
+            const asset = assets.getOrCreate({
+              sha256: media.sha256,
+              originalName: media.originalName,
+              mimeType: media.mimeType,
+              extension: media.extension,
+              byteSize: media.byteSize,
+              sourcePath: media.sourcePath,
+              managedRelPath: media.managedRelPath,
+              metadata: { importedAt: new Date().toISOString() }
+            });
+
+            const item = items.create({
+              tierListId: listId,
+              sourceType: media.kind,
+              label: media.label,
+              assetId: asset.id,
+              metadata: {
+                originalName: media.originalName,
+                mimeType: media.mimeType,
+                managedRelPath: asset.managedRelPath
+              }
+            });
+            positions.upsert({
+              itemId: item.id,
+              tierListId: listId,
+              containerType: "pool",
+              tierRowId: null,
+              sortOrder: startOrder + index
+            });
+            syncItemSearch(item);
+            return item;
+          });
+        });
+        return imported().map(mapItem);
       },
       update: (itemId: string, patch: ItemUpdateInput) => {
         const updated = db.transaction(() => {
@@ -378,6 +442,7 @@ const mapRow = (row: TierRowRecord): TierRow => ({
   listId: row.tierListId,
   label: row.label,
   color: row.fillColor,
+  textColor: row.textColor,
   sortOrder: row.sortOrder,
   style: row.style,
   createdAt: row.createdAt,
@@ -430,4 +495,166 @@ const rewriteRows = (rows: RowRepository, listId: string, currentRows: TierRowRe
   });
 };
 
-const escapeFtsQuery = (query: string) => `"${query.replace(/"/g, "\"\"")}"`;
+const mimeTypesByExtension: Record<string, string> = {
+  gif: "image/gif",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  m4v: "video/x-m4v",
+  mov: "video/quicktime",
+  mp4: "video/mp4",
+  png: "image/png",
+  webm: "video/webm",
+  webp: "image/webp"
+};
+
+const imageExtensions = new Set(["gif", "jpeg", "jpg", "png", "webp"]);
+const videoExtensions = new Set(["m4v", "mov", "mp4", "webm"]);
+
+type InspectedMediaFile = {
+  kind: "image" | "video";
+  sha256: string;
+  originalName: string;
+  label: string;
+  extension: string;
+  byteSize: number;
+  mimeType: string;
+  managedRelPath: string;
+  sourcePath: string;
+};
+
+const inspectMediaFile = async (copiedPath: string, originalPath = copiedPath): Promise<InspectedMediaFile> => {
+  const extension = extname(originalPath).replace(".", "").toLowerCase();
+  const kind: "image" | "video" | undefined = imageExtensions.has(extension)
+    ? "image"
+    : videoExtensions.has(extension)
+      ? "video"
+      : undefined;
+  if (!kind) {
+    throw new Error(`Unsupported media file type: ${originalPath}`);
+  }
+
+  const [fileStat, header, sha256] = await Promise.all([
+    stat(copiedPath),
+    readHeader(copiedPath),
+    hashFile(copiedPath)
+  ]);
+  if (!isSupportedMediaSignature(extension, header)) {
+    throw new Error(`Unsupported or invalid media file content: ${originalPath}`);
+  }
+
+  const originalName = basename(originalPath);
+  const label = basename(originalPath, extname(originalPath)).trim() || originalName;
+
+  return {
+    kind,
+    sha256,
+    originalName,
+    label,
+    extension,
+    byteSize: fileStat.size,
+    mimeType: mimeTypesByExtension[extension] ?? `${kind}/${extension}`,
+    managedRelPath: join("assets", `${sha256}.${extension}`),
+    sourcePath: originalPath
+  };
+};
+
+const stageManagedAsset = async (sourcePath: string, userDataPath: string) => {
+  const assetsDir = join(userDataPath, "assets");
+  await mkdir(assetsDir, { recursive: true });
+
+  const tempPath = join(assetsDir, `.import-${randomUUID()}.tmp`);
+  let shouldCleanTemp = true;
+  try {
+    await copyManagedAsset(sourcePath, tempPath);
+    const media = await inspectMediaFile(tempPath, sourcePath);
+    const managedPath = join(userDataPath, media.managedRelPath);
+
+    try {
+      await rename(tempPath, managedPath);
+      shouldCleanTemp = false;
+    } catch (caught) {
+      const code = (caught as NodeJS.ErrnoException).code;
+      if (code !== "EEXIST" && code !== "EPERM") {
+        throw caught;
+      }
+      await verifyManagedAsset(managedPath, media.sha256, media.byteSize);
+      await unlink(tempPath);
+      shouldCleanTemp = false;
+    }
+
+    return media;
+  } finally {
+    if (shouldCleanTemp) {
+      await unlinkIfExists(tempPath);
+    }
+  }
+};
+
+const readHeader = async (filePath: string, length = 64) => {
+  const handle = await open(filePath, "r");
+  try {
+    const buffer = Buffer.alloc(length);
+    const { bytesRead } = await handle.read(buffer, 0, length, 0);
+    return buffer.subarray(0, bytesRead);
+  } finally {
+    await handle.close();
+  }
+};
+
+const hashFile = (filePath: string) =>
+  new Promise<string>((resolve, reject) => {
+    const hash = createHash("sha256");
+    const stream = createReadStream(filePath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("error", reject);
+    stream.on("end", () => resolve(hash.digest("hex")));
+  });
+
+const copyManagedAsset = async (sourcePath: string, managedPath: string) => {
+  await copyFile(sourcePath, managedPath, constants.COPYFILE_EXCL);
+};
+
+const verifyManagedAsset = async (managedPath: string, sha256: string, byteSize: number) => {
+  const [fileStat, actualSha256] = await Promise.all([stat(managedPath), hashFile(managedPath)]);
+  if (fileStat.size !== byteSize || actualSha256 !== sha256) {
+    throw new Error(`Managed asset content does not match expected hash: ${managedPath}`);
+  }
+};
+
+const unlinkIfExists = async (filePath: string) => {
+  try {
+    await unlink(filePath);
+  } catch (caught) {
+    if ((caught as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw caught;
+    }
+  }
+};
+
+const isSupportedMediaSignature = (extension: string, header: Buffer) => {
+  switch (extension) {
+    case "png":
+      return header.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    case "jpg":
+    case "jpeg":
+      return header.length >= 3 && header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff;
+    case "gif":
+      return header.subarray(0, 6).toString("ascii") === "GIF87a" || header.subarray(0, 6).toString("ascii") === "GIF89a";
+    case "webp":
+      return header.subarray(0, 4).toString("ascii") === "RIFF" && header.subarray(8, 12).toString("ascii") === "WEBP";
+    case "webm":
+      return header.length >= 4 && header[0] === 0x1a && header[1] === 0x45 && header[2] === 0xdf && header[3] === 0xa3;
+    case "m4v":
+    case "mov":
+    case "mp4":
+      return header.subarray(4, 8).toString("ascii") === "ftyp";
+    default:
+      return false;
+  }
+};
+
+const escapeFtsQuery = (query: string) => {
+  const tokens = query.normalize("NFKC").match(/[\p{L}\p{N}]+/gu) ?? [];
+
+  return tokens.length > 0 ? tokens.map((token) => `"${token}"*`).join(" ") : "__tier_list_studio_no_match__";
+};

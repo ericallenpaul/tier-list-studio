@@ -37,6 +37,10 @@ export interface CreateMediaAssetInput {
 }
 
 export class AssetRepository extends BaseRepository {
+  getOrCreate(input: CreateMediaAssetInput): MediaAssetRecord {
+    return this.findBySha256(input.sha256) ?? this.create(input);
+  }
+
   create(input: CreateMediaAssetInput): MediaAssetRecord {
     const id = input.id ?? this.id();
     this.db.prepare(`
