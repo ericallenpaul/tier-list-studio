@@ -77,7 +77,13 @@ describe("SQLite connection and migrations", () => {
     seedDatabase(db);
 
     expect(db.prepare("SELECT COUNT(*) AS count FROM workspaces WHERE id = 'workspace-default'").get()).toEqual({ count: 1 });
-    expect(db.prepare("SELECT COUNT(*) AS count FROM templates WHERE built_in = 1").get()).toEqual({ count: 2 });
+    expect(
+      db.prepare("SELECT id FROM templates WHERE built_in = 1 ORDER BY id").all()
+    ).toEqual([
+      { id: "template-classic-ranking" },
+      { id: "template-launch-week" },
+      { id: "template-simple-priority" }
+    ]);
     expect(db.prepare("SELECT COUNT(*) AS count FROM app_settings WHERE key = 'defaultWorkspaceId'").get()).toEqual({ count: 1 });
   });
 
@@ -222,6 +228,7 @@ describe("repositories", () => {
 
     expect(builtIns.map((template) => template.id)).toEqual(expect.arrayContaining([
       "template-classic-ranking",
+      "template-launch-week",
       "template-simple-priority"
     ]));
     expect(templates.get(custom.id)?.builtIn).toBe(false);

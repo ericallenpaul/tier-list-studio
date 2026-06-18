@@ -122,6 +122,32 @@ export const seedDatabase = (db: SqliteDatabase) => {
 
 const starterTemplates = [
   {
+    id: "template-launch-week",
+    name: "Launch Week",
+    description: "S through D launch board with sample creator gear.",
+    category: "General",
+    definition: {
+      rows: [
+        { label: "S", fillColor: "#ef4444", textColor: "#ffffff" },
+        { label: "A", fillColor: "#f97316", textColor: "#111827" },
+        { label: "B", fillColor: "#eab308", textColor: "#111827" },
+        { label: "C", fillColor: "#22c55e", textColor: "#111827" },
+        { label: "D", fillColor: "#3b82f6", textColor: "#ffffff" }
+      ],
+      items: [
+        { label: "Ramen", sourceType: "text", container: "pool", rowIndex: null, sortOrder: 0 },
+        { label: "Coffee", sourceType: "text", container: "pool", rowIndex: null, sortOrder: 1 },
+        { label: "Camera", sourceType: "text", container: "pool", rowIndex: null, sortOrder: 2 },
+        { label: "Headphones", sourceType: "text", container: "pool", rowIndex: null, sortOrder: 3 },
+        { label: "Notebook", sourceType: "text", container: "pool", rowIndex: null, sortOrder: 4 },
+        { label: "Desk Lamp", sourceType: "text", container: "pool", rowIndex: null, sortOrder: 5 },
+        { label: "Microphone", sourceType: "text", container: "pool", rowIndex: null, sortOrder: 6 },
+        { label: "Mouse", sourceType: "text", container: "pool", rowIndex: null, sortOrder: 7 }
+      ],
+      styles: {}
+    }
+  },
+  {
     id: "template-classic-ranking",
     name: "Classic Ranking",
     description: "S through D rows for general rankings.",
