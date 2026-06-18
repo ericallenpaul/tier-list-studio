@@ -99,6 +99,7 @@ export interface UserSettings {
   ai: {
     preferredProviderId?: EntityId;
     enabled: boolean;
+    openAiApiKey?: string;
   };
 }
 

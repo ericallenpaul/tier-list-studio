@@ -1,12 +1,6 @@
 import type { EditorBoardItem, EditorBoardState, EditorMode, EditorScreen, EditorTier } from "../domain/editorTypes";
 import type { TierItemKind } from "../../shared/models/entities";
 
-type ProviderState = {
-  name: string;
-  configured: boolean;
-  enabled: boolean;
-};
-
 export type PersistedState = {
   screen?: EditorScreen;
   mode?: EditorMode;
@@ -14,7 +8,6 @@ export type PersistedState = {
   selectedItemIds?: string[];
   activeThemeIndex?: number;
   board?: EditorBoardState;
-  providers?: ProviderState[];
   effects?: { glow: boolean; shake: boolean; confetti: boolean };
 };
 

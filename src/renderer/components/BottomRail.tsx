@@ -1,11 +1,5 @@
-import type { EditorTier } from "../domain/editorTypes";
-
-type Template = {
-  name: string;
-  accent: string;
-  tiers: EditorTier[];
-  items: string[];
-};
+import type { TierTemplate } from "../../shared/models/entities";
+import { TemplatePicker } from "./TemplatePicker";
 
 type Theme = {
   name: string;
@@ -20,13 +14,14 @@ type Effects = {
 };
 
 type BottomRailProps = {
-  templates: Template[];
+  templates: TierTemplate[];
   themes: Theme[];
   activeThemeIndex: number;
   activeTheme: Theme;
   effects: Effects;
-  onCreateTemplate: () => void;
-  onResetBoard: (template: Template) => void;
+  canSaveTemplate: boolean;
+  onCreateTemplate: (name: string) => Promise<void>;
+  onUseTemplate: (templateId: string) => Promise<void>;
   onSetActiveThemeIndex: (index: number) => void;
   onToggleEffect: (key: keyof Effects) => void;
 };
@@ -37,33 +32,19 @@ export const BottomRail = ({
   activeThemeIndex,
   activeTheme,
   effects,
+  canSaveTemplate,
   onCreateTemplate,
-  onResetBoard,
+  onUseTemplate,
   onSetActiveThemeIndex,
   onToggleEffect
 }: BottomRailProps) => (
   <section className="bottom-rail" data-testid="bottom-rail">
-    <section className="panel templates-panel">
-      <div className="panel-head">
-        <span className="panel-title">Templates</span>
-        <button className="icon-button" aria-label="New template" onClick={onCreateTemplate}>
-          +
-        </button>
-      </div>
-      <div className="template-list">
-        {templates.map((template) => (
-          <button
-            key={template.name}
-            className="template-card"
-            style={{ ["--accent" as string]: template.accent }}
-            onClick={() => onResetBoard(template)}
-          >
-            <span className="template-name">{template.name}</span>
-            <span className="template-bar" />
-          </button>
-        ))}
-      </div>
-    </section>
+    <TemplatePicker
+      templates={templates}
+      canSaveTemplate={canSaveTemplate}
+      onSaveTemplate={onCreateTemplate}
+      onUseTemplate={onUseTemplate}
+    />
 
     <section className="panel">
       <div className="panel-head">

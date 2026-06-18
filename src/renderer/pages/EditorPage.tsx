@@ -6,25 +6,14 @@ import { ItemDock } from "../components/ItemDock";
 import { ItemInspector } from "../components/ItemInspector";
 import { PresentationSurface } from "../components/PresentationSurface";
 import { TierBoard } from "../components/TierBoard";
-import type { EditorBoardItem, EditorBoardState, EditorContainer, EditorMode, EditorScreen, EditorTier } from "../domain/editorTypes";
-
-type Template = {
-  name: string;
-  accent: string;
-  tiers: EditorTier[];
-  items: string[];
-};
+import type { TierTemplate, UserSettings } from "../../shared/models/entities";
+import { SettingsPage } from "./SettingsPage";
+import type { EditorBoardItem, EditorBoardState, EditorContainer, EditorMode, EditorScreen } from "../domain/editorTypes";
 
 type Theme = {
   name: string;
   accent: string;
   background: string;
-};
-
-type ProviderState = {
-  name: string;
-  configured: boolean;
-  enabled: boolean;
 };
 
 type Effects = {
@@ -37,11 +26,11 @@ type EditorPageProps = {
   board: EditorBoardState;
   screen: EditorScreen;
   mode: EditorMode;
-  templates: Template[];
+  templates: TierTemplate[];
   themes: Theme[];
   activeThemeIndex: number;
   activeTheme: Theme;
-  providers: ProviderState[];
+  settings: UserSettings | null;
   effects: Effects;
   selectedItemId: string | null;
   selectedItemIds: string[];
@@ -55,11 +44,11 @@ type EditorPageProps = {
   onItemsAdded: () => Promise<void>;
   isAddItemsOpen: boolean;
   onDuplicateBoard: () => void;
-  onCreateTemplate: () => void;
-  onResetBoard: (template: Template) => void;
+  onCreateTemplate: (name: string) => Promise<void>;
+  onUseTemplate: (templateId: string) => Promise<void>;
+  onSaveSettings: (openAiApiKey: string) => Promise<void>;
   onSetActiveThemeIndex: (index: number) => void;
   onToggleEffect: (key: keyof Effects) => void;
-  onToggleProvider: (name: string) => void;
   onSendSelectedToPool: () => void;
   onSendCheckedToPool: () => Promise<void> | void;
   onDuplicateCheckedItems: () => Promise<void> | void;
@@ -84,7 +73,7 @@ export const EditorPage = ({
   themes,
   activeThemeIndex,
   activeTheme,
-  providers,
+  settings,
   effects,
   selectedItemId,
   selectedItemIds,
@@ -99,10 +88,10 @@ export const EditorPage = ({
   isAddItemsOpen,
   onDuplicateBoard,
   onCreateTemplate,
-  onResetBoard,
+  onUseTemplate,
+  onSaveSettings,
   onSetActiveThemeIndex,
   onToggleEffect,
-  onToggleProvider,
   onSendSelectedToPool,
   onSendCheckedToPool,
   onDuplicateCheckedItems,
@@ -235,7 +224,8 @@ export const EditorPage = ({
             activeTheme={activeTheme}
             effects={effects}
             onCreateTemplate={onCreateTemplate}
-            onResetBoard={onResetBoard}
+            onUseTemplate={onUseTemplate}
+            canSaveTemplate={Boolean(board.id)}
             onSetActiveThemeIndex={onSetActiveThemeIndex}
             onToggleEffect={onToggleEffect}
           />
@@ -244,58 +234,15 @@ export const EditorPage = ({
           ) : null}
         </>
       ) : (
-        <section className="settings-page">
-          <section className="panel">
-            <div className="panel-head">
-              <span className="panel-title">General</span>
-              <span className="panel-chip">Settings</span>
-            </div>
-            <div className="settings-grid">
-              <div className="setting-row">
-                <span>Default board</span>
-                <button className="pill-button">Launch Week</button>
-              </div>
-              <div className="setting-row">
-                <span>Theme</span>
-                <button className="pill-button">{activeTheme.name}</button>
-              </div>
-              <div className="setting-row">
-                <span>Presentation</span>
-                <button
-                  className="pill-button"
-                  onClick={() => {
-                    onSetScreen("board");
-                    onSetMode("presentation");
-                  }}
-                >
-                  Enabled
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <section className="panel">
-            <div className="panel-head">
-              <span className="panel-title">AI</span>
-              <span className="panel-chip">Settings</span>
-            </div>
-            <div className="provider-list">
-              {providers.map((provider) => (
-                <div className="provider-card" key={provider.name}>
-                  <div>
-                    <div className="provider-name">{provider.name}</div>
-                    <div className="provider-state">{provider.configured ? "Configured" : "Disabled"}</div>
-                  </div>
-                  <button
-                    className={`switch ${provider.enabled ? "active" : ""}`}
-                    onClick={() => onToggleProvider(provider.name)}
-                    aria-label={provider.name}
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
-        </section>
+        <SettingsPage
+          activeTheme={activeTheme}
+          settings={settings}
+          onSaveSettings={onSaveSettings}
+          onOpenPresentation={() => {
+            onSetScreen("board");
+            onSetMode("presentation");
+          }}
+        />
       )}
     </section>
   );

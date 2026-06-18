@@ -125,7 +125,8 @@ export const settingsUpdateInputSchema = z
     ai: z
       .object({
         preferredProviderId: idSchema.optional(),
-        enabled: z.boolean().optional()
+        enabled: z.boolean().optional(),
+        openAiApiKey: z.string().trim().optional()
       })
       .strict()
       .optional()

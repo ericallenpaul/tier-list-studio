@@ -39,6 +39,9 @@ import { openDatabase, type SqliteDatabase } from "../services/db/connection.js"
 import { runMigrations } from "../services/db/migrations.js";
 import { createCoreListServices, type CoreListServices } from "../services/lists/listService.js";
 import type { RenderImageInput } from "../../shared/models/api.js";
+import type { TierList, TierTemplate } from "../../shared/models/entities.js";
+import { SettingsRepository, TemplateRepository } from "../services/repositories/index.js";
+import type { JsonObject, TemplateRecord, TierListRecord } from "../services/repositories/types.js";
 
 export interface IpcMainLike {
   handle: (channel: string, listener: (event: unknown, payload?: unknown) => unknown) => void;
@@ -65,11 +68,19 @@ const notImplemented = (channel: TierStudioChannel) => () => {
 let productionDb: SqliteDatabase | undefined;
 let productionCoreServices: CoreListServices | undefined;
 
-const getProductionCoreServices = (app: Pick<App, "getPath">) => {
-  if (!productionCoreServices) {
+const getProductionDb = (app: Pick<App, "getPath">) => {
+  if (!productionDb) {
     productionDb = openDatabase({ filePath: join(app.getPath("userData"), "tier-list-studio.sqlite") });
     runMigrations(productionDb);
-    productionCoreServices = createCoreListServices(productionDb, { userDataPath: app.getPath("userData") });
+  }
+
+  return productionDb;
+};
+
+const getProductionCoreServices = (app: Pick<App, "getPath">) => {
+  if (!productionCoreServices) {
+    const db = getProductionDb(app);
+    productionCoreServices = createCoreListServices(db, { userDataPath: app.getPath("userData") });
   }
 
   return productionCoreServices;
@@ -204,6 +215,7 @@ export const registerHandlers = (
   options: RegisterHandlerOptions = {}
 ) => {
   const coreServices = () => (options.services as CoreListServices | undefined) ?? getProductionCoreServices(app);
+  const database = () => productionDb ?? getProductionDb(app);
   const grantedFilePaths: DialogGrantStore = new Map();
 
   registerValidatedHandler(ipcMain, tierStudioChannels.app.getVersion, voidPayloadSchema, () => app.getVersion());
@@ -258,9 +270,18 @@ export const registerHandlers = (
   registerValidatedHandler(ipcMain, tierStudioChannels.positions.move, positionMoveInputSchema, (input) => coreServices().positions.move(input));
   registerValidatedHandler(ipcMain, tierStudioChannels.positions.normalize, listIdPayloadSchema, ({ listId }) => coreServices().positions.normalize(listId));
 
-  registerValidatedHandler(ipcMain, tierStudioChannels.templates.list, voidPayloadSchema, notImplemented(tierStudioChannels.templates.list));
-  registerValidatedHandler(ipcMain, tierStudioChannels.templates.createFromList, templateCreateFromListPayloadSchema, notImplemented(tierStudioChannels.templates.createFromList));
-  registerValidatedHandler(ipcMain, tierStudioChannels.templates.instantiate, templateInstantiatePayloadSchema, notImplemented(tierStudioChannels.templates.instantiate));
+  registerValidatedHandler(ipcMain, tierStudioChannels.templates.list, voidPayloadSchema, () =>
+    options.services?.templates?.list
+      ? options.services.templates.list()
+      : new TemplateRepository(database()).list().map(mapTemplate));
+  registerValidatedHandler(ipcMain, tierStudioChannels.templates.createFromList, templateCreateFromListPayloadSchema, ({ listId, name }) =>
+    options.services?.templates?.createFromList
+      ? options.services.templates.createFromList(listId, name)
+      : mapTemplate(database().transaction(() => new TemplateRepository(database()).createFromList(listId, name))()));
+  registerValidatedHandler(ipcMain, tierStudioChannels.templates.instantiate, templateInstantiatePayloadSchema, ({ templateId, workspaceId }) =>
+    options.services?.templates?.instantiate
+      ? options.services.templates.instantiate(templateId, workspaceId)
+      : mapList(database().transaction(() => new TemplateRepository(database()).instantiate(templateId, workspaceId))()));
 
   registerValidatedHandler(ipcMain, tierStudioChannels.snapshots.create, snapshotCreatePayloadSchema, notImplemented(tierStudioChannels.snapshots.create));
   registerValidatedHandler(ipcMain, tierStudioChannels.snapshots.list, listIdPayloadSchema, notImplemented(tierStudioChannels.snapshots.list));
@@ -273,9 +294,61 @@ export const registerHandlers = (
   registerValidatedHandler(ipcMain, tierStudioChannels.backups.create, voidPayloadSchema, notImplemented(tierStudioChannels.backups.create));
   registerValidatedHandler(ipcMain, tierStudioChannels.backups.restore, filePathPayloadSchema, notImplemented(tierStudioChannels.backups.restore));
 
-  registerValidatedHandler(ipcMain, tierStudioChannels.settings.get, voidPayloadSchema, notImplemented(tierStudioChannels.settings.get));
-  registerValidatedHandler(ipcMain, tierStudioChannels.settings.update, settingsUpdateInputSchema, notImplemented(tierStudioChannels.settings.update));
+  registerValidatedHandler(ipcMain, tierStudioChannels.settings.get, voidPayloadSchema, () =>
+    options.services?.settings?.get ? options.services.settings.get() : new SettingsRepository(database()).getUserSettings());
+  registerValidatedHandler(ipcMain, tierStudioChannels.settings.update, settingsUpdateInputSchema, (input) =>
+    options.services?.settings?.update ? options.services.settings.update(input) : new SettingsRepository(database()).updateUserSettings(input));
 
-  registerValidatedHandler(ipcMain, tierStudioChannels.ai.getProviders, voidPayloadSchema, notImplemented(tierStudioChannels.ai.getProviders));
+  registerValidatedHandler(ipcMain, tierStudioChannels.ai.getProviders, voidPayloadSchema, () =>
+    options.services?.ai?.getProviders
+      ? options.services.ai.getProviders()
+      : [{
+          id: "openai",
+          name: "OpenAI",
+          configured: Boolean(new SettingsRepository(database()).getUserSettings().ai.openAiApiKey),
+          capabilities: ["generate-items" as const]
+        }]);
   registerValidatedHandler(ipcMain, tierStudioChannels.ai.generateItems, aiGenerateItemsInputSchema, notImplemented(tierStudioChannels.ai.generateItems));
 };
+
+const mapTemplate = (template: TemplateRecord): TierTemplate => {
+  const definition = isRecord(template.definition) ? template.definition : {};
+  const rows = Array.isArray(definition.rows)
+    ? definition.rows
+        .filter(isRecord)
+        .map((row) => ({
+          label: typeof row.label === "string" ? row.label : "",
+          color: typeof row.fillColor === "string"
+            ? row.fillColor
+            : typeof row.color === "string"
+              ? row.color
+              : "#64748b",
+          style: isRecord(row.style) ? row.style : {}
+        }))
+        .filter((row) => row.label)
+    : [];
+
+  return {
+    id: template.id,
+    name: template.name,
+    sourceListId: template.sourceTierListId ?? undefined,
+    rows,
+    style: isRecord(definition.style) ? definition.style : {},
+    createdAt: template.createdAt,
+    updatedAt: template.updatedAt
+  };
+};
+
+const mapList = (list: TierListRecord): TierList => ({
+  id: list.id,
+  workspaceId: list.workspaceId,
+  name: list.title,
+  description: list.description,
+  isArchived: false,
+  style: list.boardStyle,
+  createdAt: list.createdAt,
+  updatedAt: list.updatedAt
+});
+
+const isRecord = (value: unknown): value is JsonObject =>
+  typeof value === "object" && value !== null && !Array.isArray(value);

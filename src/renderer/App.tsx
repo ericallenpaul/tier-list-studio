@@ -3,6 +3,7 @@ import { toPng } from "html-to-image";
 
 import { mapTierListToBoard } from "./domain/editorMappers";
 import type { EditorBoardItem, EditorBoardState, EditorContainer, EditorMode, EditorScreen, EditorTier } from "./domain/editorTypes";
+import type { TierTemplate, UserSettings } from "../shared/models/entities";
 import { DashboardPage } from "./pages/DashboardPage";
 import { EditorPage } from "./pages/EditorPage";
 import { activeListSessionKey, activeListStorageKey, createEditorStore } from "./state/editorStore";
@@ -19,12 +20,6 @@ type Theme = {
   name: string;
   accent: string;
   background: string;
-};
-
-type ProviderState = {
-  name: string;
-  configured: boolean;
-  enabled: boolean;
 };
 
 const initialTemplates: Template[] = [
@@ -57,12 +52,6 @@ const themes: Theme[] = [
   { name: "Midnight", accent: "#22c55e", background: "#0f1218" },
   { name: "Signal", accent: "#38bdf8", background: "#0b1020" },
   { name: "Heat", accent: "#f97316", background: "#150f0b" }
-];
-
-const defaultProviders: ProviderState[] = [
-  { name: "OpenAI", configured: true, enabled: true },
-  { name: "Anthropic", configured: false, enabled: false },
-  { name: "Local", configured: false, enabled: false }
 ];
 
 const makeBoard = (template: Template = initialTemplates[0]): EditorBoardState => {
@@ -130,20 +119,28 @@ export const App = () => {
   const [screen, setScreen] = useState<EditorScreen>(saved?.screen ?? "board");
   const [mode, setMode] = useState<EditorMode>(saved?.mode ?? "build");
   const [board, setBoard] = useState<EditorBoardState>(saved?.board ?? makeBoard());
-  const [templates, setTemplates] = useState<Template[]>(initialTemplates);
+  const [templates, setTemplates] = useState<TierTemplate[]>([]);
+  const [settings, setSettings] = useState<UserSettings | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(saved?.selectedItemId ?? null);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>(saved?.selectedItemIds ?? []);
   const [activeThemeIndex, setActiveThemeIndex] = useState(saved?.activeThemeIndex ?? 0);
-  const [providers, setProviders] = useState<ProviderState[]>(saved?.providers ?? defaultProviders);
   const [effects, setEffects] = useState(saved?.effects ?? { glow: true, shake: false, confetti: false });
   const [isAddItemsOpen, setIsAddItemsOpen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(
       "tier-list-studio-state",
-      JSON.stringify({ screen, mode, board, selectedItemId, selectedItemIds, activeThemeIndex, providers, effects })
+      JSON.stringify({ screen, mode, board, selectedItemId, selectedItemIds, activeThemeIndex, effects })
     );
-  }, [screen, mode, board, selectedItemId, selectedItemIds, activeThemeIndex, providers, effects]);
+  }, [screen, mode, board, selectedItemId, selectedItemIds, activeThemeIndex, effects]);
+
+  const refreshTemplates = async () => {
+    setTemplates(await window.tierStudio.templates.list());
+  };
+
+  const refreshSettings = async () => {
+    setSettings(await window.tierStudio.settings.get());
+  };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -179,6 +176,11 @@ export const App = () => {
     };
   }, [savedListId, startsInEditor]);
 
+  useEffect(() => {
+    void refreshTemplates();
+    void refreshSettings();
+  }, []);
+
   const activeTheme = themes[activeThemeIndex];
   const selectedItem = useMemo(
     () => board.items.find((item) => item.id === selectedItemId) ?? null,
@@ -193,28 +195,13 @@ export const App = () => {
     setSelectedItemIds((current) => current.filter((itemId) => itemIds.has(itemId)));
   }, [board.items, selectedItemId]);
 
-  const resetBoard = (template: Template = templates[0]) => {
-    setBoard(makeBoard(template));
-    setSelectedItemId(null);
-    setSelectedItemIds([]);
-    setScreen("board");
-  };
-
-  const createTemplateFromBoard = () => {
-    const name = window.prompt("Template name", `${board.name} Template`);
-    if (!name?.trim()) {
-      return;
+  const createTemplateFromBoard = async (name: string) => {
+    if (!board.id) {
+      throw new Error("Save the board before creating a template.");
     }
 
-    setTemplates((current) => [
-      ...current,
-      {
-        name: name.trim(),
-        accent: activeTheme.accent,
-        tiers: board.tiers.map((tier) => ({ ...tier })),
-        items: board.items.map((item) => item.label)
-      }
-    ]);
+    const created = await window.tierStudio.templates.createFromList(board.id, name);
+    setTemplates((current) => [...current.filter((template) => template.id !== created.id), created]);
   };
 
   const duplicateBoard = () => {
@@ -264,12 +251,6 @@ export const App = () => {
     setBoard(await loadBoard(board.id));
     setSelectedItemId(null);
     setSelectedItemIds([]);
-  };
-
-  const toggleProvider = (name: string) => {
-    setProviders((current) =>
-      current.map((provider) => (provider.name === name ? { ...provider, enabled: !provider.enabled } : provider))
-    );
   };
 
   const toggleEffect = (key: keyof typeof effects) => {
@@ -490,6 +471,30 @@ export const App = () => {
     setIsEditorOpen(true);
   };
 
+  const resolveTemplateWorkspaceId = async () => {
+    if (settings?.defaultWorkspaceId) {
+      return settings.defaultWorkspaceId;
+    }
+
+    const workspaces = await window.tierStudio.workspaces.list();
+    return workspaces[0]?.id ?? (await window.tierStudio.workspaces.create({ name: "Tier List Studio" })).id;
+  };
+
+  const useTemplate = async (templateId: string) => {
+    const list = await window.tierStudio.templates.instantiate(templateId, await resolveTemplateWorkspaceId());
+    await openBoard(list.id);
+  };
+
+  const saveSettings = async (openAiApiKey: string) => {
+    setSettings(await window.tierStudio.settings.update({
+      ai: {
+        preferredProviderId: "openai",
+        enabled: Boolean(openAiApiKey.trim()),
+        openAiApiKey
+      }
+    }));
+  };
+
   if (!isEditorOpen) {
     return <DashboardPage store={editorStore} onOpenBoard={openBoard} />;
   }
@@ -509,7 +514,7 @@ export const App = () => {
         themes={themes}
         activeThemeIndex={activeThemeIndex}
         activeTheme={activeTheme}
-        providers={providers}
+        settings={settings}
         effects={effects}
         selectedItemId={selectedItemId}
         selectedItemIds={selectedItemIds}
@@ -524,10 +529,10 @@ export const App = () => {
         isAddItemsOpen={isAddItemsOpen}
         onDuplicateBoard={duplicateBoard}
         onCreateTemplate={createTemplateFromBoard}
-        onResetBoard={resetBoard}
+        onUseTemplate={useTemplate}
+        onSaveSettings={saveSettings}
         onSetActiveThemeIndex={setActiveThemeIndex}
         onToggleEffect={toggleEffect}
-        onToggleProvider={toggleProvider}
         onSendSelectedToPool={sendSelectedToPool}
         onSendCheckedToPool={sendCheckedToPool}
         onDuplicateCheckedItems={duplicateCheckedItems}
