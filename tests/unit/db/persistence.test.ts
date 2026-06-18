@@ -227,12 +227,140 @@ describe("repositories", () => {
     expect(templates.get(custom.id)?.builtIn).toBe(false);
   });
 
+  it("creates reusable templates with item placements, styles, assets, and search rows", () => {
+    const assets = new AssetRepository(db);
+    const lists = new ListRepository(db);
+    const rows = new RowRepository(db);
+    const items = new ItemRepository(db);
+    const positions = new PositionRepository(db);
+    const templates = new TemplateRepository(db);
+    const search = new SearchRepository(db);
+
+    const asset = assets.create({
+      sha256: "template-asset-sha",
+      originalName: "cover.png",
+      mimeType: "image/png",
+      extension: "png",
+      byteSize: 128,
+      sourcePath: "C:/source/cover.png",
+      managedRelPath: "assets/template-asset-sha.png"
+    });
+    const source = lists.create({
+      workspaceId: "workspace-default",
+      title: "Source Media Board",
+      slug: "source-media-board",
+      boardStyle: { density: "compact" }
+    });
+    const topRow = rows.create({
+      tierListId: source.id,
+      sortOrder: 0,
+      label: "Top",
+      fillColor: "#ef4444",
+      textColor: "#ffffff",
+      style: { emphasis: "high" }
+    });
+    const nextRow = rows.create({
+      tierListId: source.id,
+      sortOrder: 1,
+      label: "Next",
+      fillColor: "#22c55e",
+      textColor: "#111827"
+    });
+    const tierText = items.create({
+      tierListId: source.id,
+      sourceType: "text",
+      label: "Alpha",
+      style: { badge: "gold" },
+      metadata: { origin: "manual" }
+    });
+    const tierImage = items.create({
+      tierListId: source.id,
+      sourceType: "image",
+      label: "Cover Art",
+      assetId: asset.id,
+      style: { crop: "cover" },
+      metadata: { alt: "Cover" }
+    });
+    const poolItem = items.create({
+      tierListId: source.id,
+      sourceType: "text",
+      label: "Backlog",
+      style: { muted: true },
+      metadata: { origin: "pool" }
+    });
+    positions.upsert({ itemId: tierText.id, tierListId: source.id, containerType: "tier", tierRowId: topRow.id, sortOrder: 0 });
+    positions.upsert({ itemId: tierImage.id, tierListId: source.id, containerType: "tier", tierRowId: nextRow.id, sortOrder: 1 });
+    positions.upsert({ itemId: poolItem.id, tierListId: source.id, containerType: "pool", tierRowId: null, sortOrder: 2 });
+
+    const template = templates.createFromList(source.id, "Reusable Media Board");
+    const definition = template.definition as {
+      rows: Array<{ label: string; fillColor: string; style: Record<string, unknown> }>;
+      items: Array<{ label: string; assetId?: string | null; metadata: Record<string, unknown>; style: Record<string, unknown> }>;
+      style: Record<string, unknown>;
+    };
+    expect(definition.rows.map((row) => row.label)).toEqual(["Top", "Next"]);
+    expect(definition.items.find((item) => item.label === "Cover Art")?.assetId).toBe(asset.id);
+    expect(definition.style).toEqual({ density: "compact" });
+
+    const created = templates.instantiate(template.id, "workspace-default");
+    const createdRows = rows.listByTierList(created.id);
+    expect(createdRows.map((row) => [row.sortOrder, row.label, row.fillColor, row.style])).toEqual([
+      [0, "Top", "#ef4444", { emphasis: "high" }],
+      [1, "Next", "#22c55e", {}]
+    ]);
+
+    const createdItems = db.prepare("SELECT * FROM items WHERE tier_list_id = ? ORDER BY label").all(created.id) as Array<{
+      id: string;
+      label: string;
+      asset_id: string | null;
+      style_json: string;
+      metadata_json: string;
+    }>;
+    expect(createdItems.map((item) => [item.label, item.asset_id, JSON.parse(item.style_json), JSON.parse(item.metadata_json)])).toEqual([
+      ["Alpha", null, { badge: "gold" }, { origin: "manual" }],
+      ["Backlog", null, { muted: true }, { origin: "pool" }],
+      ["Cover Art", asset.id, { crop: "cover" }, { alt: "Cover" }]
+    ]);
+
+    const createdItemIdByLabel = new Map(createdItems.map((item) => [item.label, item.id]));
+    const createdPositions = positions.listByTierList(created.id);
+    expect(createdPositions.map((position) => ({
+      itemLabel: [...createdItemIdByLabel.entries()].find((entry) => entry[1] === position.itemId)?.[0],
+      rowLabel: createdRows.find((row) => row.id === position.tierRowId)?.label ?? null,
+      sortOrder: position.sortOrder
+    }))).toEqual([
+      { itemLabel: "Backlog", rowLabel: null, sortOrder: 2 },
+      { itemLabel: "Alpha", rowLabel: "Top", sortOrder: 0 },
+      { itemLabel: "Cover Art", rowLabel: "Next", sortOrder: 1 }
+    ]);
+    expect(search.query("Reusable", { entityType: "list" }).map((result) => result.entityId)).toContain(created.id);
+    expect(search.query("Cover", { entityType: "item" }).map((result) => result.entityId)).toContain(createdItemIdByLabel.get("Cover Art"));
+  });
+
   it("stores settings JSON values", () => {
     const settings = new SettingsRepository(db);
     const setting = settings.set("windowBounds", { width: 1200, height: 800 });
 
     expect(setting.value).toEqual({ width: 1200, height: 800 });
     expect(settings.get("windowBounds")?.value).toEqual({ width: 1200, height: 800 });
+  });
+
+  it("does not expose saved OpenAI API keys in user settings responses", () => {
+    const settings = new SettingsRepository(db);
+
+    const updated = settings.updateUserSettings({
+      ai: {
+        preferredProviderId: "openai",
+        enabled: true,
+        openAiApiKey: "sk-test-secret"
+      }
+    });
+
+    expect(updated.ai.openAiApiKey).toBeUndefined();
+    expect(updated.ai.openAiApiKeyConfigured).toBe(true);
+    expect(settings.getUserSettings().ai.openAiApiKey).toBeUndefined();
+    expect(settings.hasOpenAiApiKey()).toBe(true);
+    expect((settings.get("ai")?.value as { openAiApiKey?: string }).openAiApiKey).toBe("sk-test-secret");
   });
 
   it("replaces and queries FTS search rows", () => {

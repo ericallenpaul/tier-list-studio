@@ -11,24 +11,26 @@ type Theme = {
 type SettingsPageProps = {
   activeTheme: Theme;
   settings: UserSettings | null;
-  onSaveSettings: (openAiApiKey: string) => Promise<void>;
+  onSaveSettings: (openAiApiKey?: string) => Promise<void>;
   onOpenPresentation: () => void;
 };
 
 export const SettingsPage = ({ activeTheme, settings, onSaveSettings, onOpenPresentation }: SettingsPageProps) => {
   const [openAiApiKey, setOpenAiApiKey] = useState(settings?.ai.openAiApiKey ?? "");
+  const [hasEditedApiKey, setHasEditedApiKey] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setOpenAiApiKey(settings?.ai.openAiApiKey ?? "");
-  }, [settings?.ai.openAiApiKey]);
+    setHasEditedApiKey(false);
+  }, [settings?.ai.openAiApiKey, settings?.ai.openAiApiKeyConfigured]);
 
   const saveSettings = async () => {
     setError(null);
     setIsSaving(true);
     try {
-      await onSaveSettings(openAiApiKey);
+      await onSaveSettings(hasEditedApiKey ? openAiApiKey : undefined);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not save settings.");
     } finally {
@@ -66,7 +68,7 @@ export const SettingsPage = ({ activeTheme, settings, onSaveSettings, onOpenPres
           <div className="provider-card">
             <div>
               <div className="provider-name">OpenAI</div>
-              <div className="provider-state">{openAiApiKey.trim() ? "Configured" : "Not configured"}</div>
+              <div className="provider-state">{openAiApiKey.trim() || settings?.ai.openAiApiKeyConfigured ? "Configured" : "Not configured"}</div>
             </div>
             <label className="settings-field" htmlFor="openai-api-key">
               <span>OpenAI API key</span>
@@ -74,7 +76,11 @@ export const SettingsPage = ({ activeTheme, settings, onSaveSettings, onOpenPres
                 id="openai-api-key"
                 type="password"
                 value={openAiApiKey}
-                onChange={(event) => setOpenAiApiKey(event.target.value)}
+                placeholder={settings?.ai.openAiApiKeyConfigured ? "Saved key hidden" : undefined}
+                onChange={(event) => {
+                  setOpenAiApiKey(event.target.value);
+                  setHasEditedApiKey(true);
+                }}
                 autoComplete="off"
               />
             </label>

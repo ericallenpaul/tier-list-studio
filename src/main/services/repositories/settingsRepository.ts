@@ -11,7 +11,21 @@ interface SettingRow {
 
 export class SettingsRepository extends BaseRepository {
   getUserSettings(): UserSettings {
+    return this.mapUserSettings(true);
+  }
+
+  hasOpenAiApiKey() {
     const ai = asRecord(this.get("ai")?.value) ?? {};
+    return Boolean(asOptionalString(ai.openAiApiKey));
+  }
+
+  private getStoredUserSettings(): UserSettings {
+    return this.mapUserSettings(false);
+  }
+
+  private mapUserSettings(redactSecrets: boolean): UserSettings {
+    const ai = asRecord(this.get("ai")?.value) ?? {};
+    const openAiApiKey = asOptionalString(ai.openAiApiKey);
     return {
       theme: asTheme(this.get("theme")?.value),
       defaultWorkspaceId: asOptionalString(this.get("defaultWorkspaceId")?.value),
@@ -20,13 +34,14 @@ export class SettingsRepository extends BaseRepository {
       ai: {
         preferredProviderId: asOptionalString(ai.preferredProviderId),
         enabled: typeof ai.enabled === "boolean" ? ai.enabled : false,
-        openAiApiKey: asOptionalString(ai.openAiApiKey)
+        openAiApiKeyConfigured: Boolean(openAiApiKey),
+        openAiApiKey: redactSecrets ? undefined : openAiApiKey
       }
     };
   }
 
   updateUserSettings(patch: SettingsUpdateInput): UserSettings {
-    const current = this.getUserSettings();
+    const current = this.getStoredUserSettings();
 
     if (patch.theme !== undefined) {
       this.set("theme", patch.theme);
@@ -41,10 +56,16 @@ export class SettingsRepository extends BaseRepository {
       this.set("exportDefaults", patch.exportDefaults as JsonValue);
     }
     if (patch.ai !== undefined) {
-      this.set("ai", {
-        ...current.ai,
-        ...patch.ai
-      });
+      const ai: Record<string, JsonValue> = { enabled: patch.ai.enabled ?? current.ai.enabled };
+      const preferredProviderId = patch.ai.preferredProviderId ?? current.ai.preferredProviderId;
+      const openAiApiKey = patch.ai.openAiApiKey ?? current.ai.openAiApiKey;
+      if (preferredProviderId !== undefined) {
+        ai.preferredProviderId = preferredProviderId;
+      }
+      if (openAiApiKey !== undefined) {
+        ai.openAiApiKey = openAiApiKey;
+      }
+      this.set("ai", ai);
     }
 
     return this.getUserSettings();

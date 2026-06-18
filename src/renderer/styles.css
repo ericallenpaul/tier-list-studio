@@ -450,6 +450,11 @@ button {
   font-weight: 600;
 }
 
+.template-status {
+  color: #bae6fd;
+  font-size: 0.78rem;
+}
+
 .swatch {
   width: 28px;
   height: 28px;

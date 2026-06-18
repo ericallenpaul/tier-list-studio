@@ -46,14 +46,25 @@ test.describe("settings and templates", () => {
 
   test("saves provider settings outside the board and creates a reusable template", async () => {
     await createBoard(page, "Template Source");
+    await page.getByRole("button", { name: "Add Items" }).click();
+    await page.getByLabel("Items").fill("Camera\nMicrophone");
+    await page.getByRole("button", { name: "Add 2 Items" }).click();
+    await expect(page.getByTestId("item-dock").getByText("Camera")).toBeVisible();
+
     await page.getByRole("button", { name: "Settings" }).click();
     await page.getByLabel("OpenAI API key").fill("test-key");
     await page.getByRole("button", { name: "Save Settings" }).click();
+    await expect(page.getByLabel("OpenAI API key")).toHaveValue("");
+    await expect(page.getByText("Configured")).toBeVisible();
     await expect(page.getByTestId("tier-board")).toBeHidden();
     await page.getByRole("button", { name: "Board" }).click();
     await page.getByRole("button", { name: "Save as Template" }).click();
     await page.getByLabel("Template name").fill("Starter Creator Board");
     await page.getByRole("button", { name: "Save Template" }).click();
     await expect(page.getByText("Starter Creator Board")).toBeVisible();
+    await page.getByRole("button", { name: /Starter Creator Board/ }).click();
+    await expect(page.getByRole("heading", { name: "Starter Creator Board" })).toBeVisible();
+    await expect(page.getByTestId("item-dock").getByText("Camera")).toBeVisible();
+    await expect(page.getByTestId("item-dock").getByText("Microphone")).toBeVisible();
   });
 });

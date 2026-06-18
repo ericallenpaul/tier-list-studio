@@ -14,6 +14,7 @@ export const TemplatePicker = ({ templates, canSaveTemplate, onSaveTemplate, onU
   const [templateName, setTemplateName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [usingTemplateId, setUsingTemplateId] = useState<string | null>(null);
 
   const saveTemplate = async () => {
     const name = templateName.trim();
@@ -35,6 +36,18 @@ export const TemplatePicker = ({ templates, canSaveTemplate, onSaveTemplate, onU
     }
   };
 
+  const useTemplate = async (templateId: string) => {
+    setError(null);
+    setUsingTemplateId(templateId);
+    try {
+      await onUseTemplate(templateId);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not use template.");
+    } finally {
+      setUsingTemplateId(null);
+    }
+  };
+
   return (
     <section className="panel templates-panel">
       <div className="panel-head">
@@ -49,13 +62,16 @@ export const TemplatePicker = ({ templates, canSaveTemplate, onSaveTemplate, onU
             key={template.id}
             className="template-card"
             style={{ ["--accent" as string]: template.rows[0]?.color ?? "#38bdf8" }}
-            onClick={() => void onUseTemplate(template.id)}
+            disabled={Boolean(usingTemplateId)}
+            onClick={() => void useTemplate(template.id)}
           >
             <span className="template-name">{template.name}</span>
+            {usingTemplateId === template.id ? <span className="template-status">Using...</span> : null}
             <span className="template-bar" />
           </button>
         ))}
       </div>
+      {error && !isSaveOpen ? <p className="modal-error">{error}</p> : null}
 
       {isSaveOpen ? (
         <div className="modal-backdrop" role="presentation">

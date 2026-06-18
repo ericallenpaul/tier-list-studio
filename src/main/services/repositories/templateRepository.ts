@@ -1,6 +1,7 @@
 import { BaseRepository } from "./baseRepository.js";
 import type { SqliteDatabase } from "../db/connection.js";
 import type { JsonObject, JsonValue, TemplateRecord, TierListRecord } from "./types.js";
+import { SearchRepository } from "./searchRepository.js";
 
 interface TemplateRow {
   id: string;
@@ -34,6 +35,7 @@ type TemplateDefinitionRow = {
 type TemplateDefinitionItem = {
   label: string;
   sourceType: "text" | "image" | "video" | "mixed";
+  assetId?: string | null;
   metadata?: JsonObject;
   style?: JsonObject;
   container: "pool" | "tier";
@@ -97,6 +99,7 @@ export class TemplateRepository extends BaseRepository {
       return {
         label: item.label,
         sourceType: item.source_type,
+        assetId: item.asset_id,
         metadata: this.parseObject(item.metadata_json, "items.metadata_json"),
         style: this.parseObject(item.style_json, "items.style_json"),
         container: position?.container_type ?? "pool",
@@ -134,6 +137,7 @@ export class TemplateRepository extends BaseRepository {
     const now = this.now();
     const listId = this.id();
     const slug = uniqueSlug(this.db, workspaceId, template.name);
+    const search = new SearchRepository(this.db);
 
     this.db.prepare(`
       INSERT INTO tier_lists (
@@ -153,6 +157,11 @@ export class TemplateRepository extends BaseRepository {
       boardStyleJson: this.stringify(definition.style, {}),
       createdAt: now,
       updatedAt: now
+    });
+    search.replace({
+      entityType: "list",
+      entityId: listId,
+      title: template.name
     });
 
     const rowIds = definition.rows.map((row, index) => {
@@ -189,7 +198,7 @@ export class TemplateRepository extends BaseRepository {
           style_json, metadata_json, created_at, updated_at
         )
         VALUES (
-          @id, @tierListId, @sourceType, @label, '', '', '[]', NULL,
+          @id, @tierListId, @sourceType, @label, '', '', '[]', @assetId,
           @styleJson, @metadataJson, @createdAt, @updatedAt
         )
       `).run({
@@ -197,10 +206,16 @@ export class TemplateRepository extends BaseRepository {
         tierListId: listId,
         sourceType: item.sourceType,
         label: item.label,
+        assetId: this.resolveAssetId(item.assetId),
         styleJson: this.stringify(item.style, {}),
         metadataJson: this.stringify(item.metadata, {}),
         createdAt: now,
         updatedAt: now
+      });
+      search.replace({
+        entityType: "item",
+        entityId: itemId,
+        title: item.label
       });
 
       const rowId = item.container === "tier" && item.rowIndex !== null ? rowIds[item.rowIndex] : undefined;
@@ -297,6 +312,14 @@ export class TemplateRepository extends BaseRepository {
   private sourcePositions(listId: string) {
     return this.db.prepare("SELECT * FROM item_positions WHERE tier_list_id = ? ORDER BY container_type, sort_order").all(listId) as SourcePositionRow[];
   }
+
+  private resolveAssetId(assetId: string | null | undefined) {
+    if (!assetId) {
+      return null;
+    }
+
+    return this.db.prepare("SELECT 1 FROM media_assets WHERE id = ?").get(assetId) ? assetId : null;
+  }
 }
 
 interface SourceListRow {
@@ -328,6 +351,7 @@ interface SourceItemRow {
   id: string;
   source_type: TemplateDefinitionItem["sourceType"];
   label: string;
+  asset_id: string | null;
   style_json: string;
   metadata_json: string;
 }
@@ -365,6 +389,7 @@ const normalizeTemplateDefinition = (value: JsonValue): TemplateDefinition => {
     .map<TemplateDefinitionItem>((item, index) => ({
       label: typeof item.label === "string" ? item.label : "",
       sourceType: isSourceType(item.sourceType) ? item.sourceType : "text",
+      assetId: typeof item.assetId === "string" && item.assetId.trim() ? item.assetId : null,
       metadata: isRecord(item.metadata) ? item.metadata : {},
       style: isRecord(item.style) ? item.style : {},
       container: item.container === "tier" ? "tier" : "pool",

@@ -485,12 +485,12 @@ export const App = () => {
     await openBoard(list.id);
   };
 
-  const saveSettings = async (openAiApiKey: string) => {
+  const saveSettings = async (openAiApiKey?: string) => {
     setSettings(await window.tierStudio.settings.update({
       ai: {
         preferredProviderId: "openai",
-        enabled: Boolean(openAiApiKey.trim()),
-        openAiApiKey
+        enabled: openAiApiKey === undefined ? Boolean(settings?.ai.openAiApiKeyConfigured) : Boolean(openAiApiKey.trim()),
+        ...(openAiApiKey === undefined ? {} : { openAiApiKey })
       }
     }));
   };

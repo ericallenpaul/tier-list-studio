@@ -305,7 +305,7 @@ export const registerHandlers = (
       : [{
           id: "openai",
           name: "OpenAI",
-          configured: Boolean(new SettingsRepository(database()).getUserSettings().ai.openAiApiKey),
+          configured: new SettingsRepository(database()).hasOpenAiApiKey(),
           capabilities: ["generate-items" as const]
         }]);
   registerValidatedHandler(ipcMain, tierStudioChannels.ai.generateItems, aiGenerateItemsInputSchema, notImplemented(tierStudioChannels.ai.generateItems));
