@@ -82,4 +82,19 @@ test.describe("board editing", () => {
     await expect(page.getByRole("heading", { name: "Persisted Movement" })).toBeVisible();
     await expect(page.locator(".tier-row").filter({ hasText: "S" })).toContainText("Pizza");
   });
+
+  test("keyboard row controls do not move the selected pool item", async () => {
+    await createBoard(page, "Keyboard Row Controls");
+    await page.getByRole("button", { name: "Add Items" }).click();
+    await page.getByRole("tab", { name: "Text" }).click();
+    await page.getByLabel("Items").fill("Pizza");
+    await page.getByRole("button", { name: "Add 1 Item" }).click();
+
+    await page.getByRole("button", { name: "Pizza" }).click();
+    await page.getByRole("button", { name: "Edit row S" }).press("Enter");
+
+    await expect(page.getByRole("dialog", { name: "Edit row S" })).toBeVisible();
+    await expect(page.locator(".tier-row").filter({ hasText: "S" })).not.toContainText("Pizza");
+    await expect(page.getByTestId("item-dock")).toContainText("Pizza");
+  });
 });

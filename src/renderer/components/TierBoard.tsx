@@ -101,6 +101,9 @@ const SortableTierRow = ({
       onDrop={(event) => onDropItem(event, tier.id)}
       onClick={() => selectedItem && void onMoveItem(selectedItem.id, tier.id)}
       onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
+        if (event.target !== event.currentTarget) {
+          return;
+        }
         if (selectedItem && (event.key === "Enter" || event.key === " ")) {
           event.preventDefault();
           void onMoveItem(selectedItem.id, tier.id);
