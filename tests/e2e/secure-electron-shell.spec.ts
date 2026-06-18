@@ -110,11 +110,12 @@ test.describe("secure Electron shell", () => {
     );
 
     await page.getByRole("button", { name: "Export" }).click();
+    await page.getByRole("button", { name: "PNG" }).click();
 
     const artifact = await exportPromise;
     expect(artifact.format).toBe("png");
     expect(artifact.filePath).toMatch(/(?:presentation|export)-shell.*\.png$/i);
     expect(existsSync(artifact.filePath)).toBe(true);
-    await expect(page.locator(".topbar")).toBeHidden();
+    await expect(page.locator(".topbar")).toBeVisible();
   });
 });

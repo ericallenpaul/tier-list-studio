@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState, type DragEvent } from "react";
-import { toPng } from "html-to-image";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { toJpeg, toPng } from "html-to-image";
 
 import { mapTierListToBoard } from "./domain/editorMappers";
 import type { EditorBoardItem, EditorBoardState, EditorContainer, EditorMode, EditorScreen, EditorTier } from "./domain/editorTypes";
 import type { TierTemplate, UserSettings } from "../shared/models/entities";
+import type { ImageExportFormat } from "./components/ExportPanel";
+import { PresentationSurface } from "./components/PresentationSurface";
 import { DashboardPage } from "./pages/DashboardPage";
 import { EditorPage } from "./pages/EditorPage";
 import { activeListSessionKey, activeListStorageKey, createEditorStore } from "./state/editorStore";
@@ -77,7 +79,8 @@ const waitForPaint = () =>
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
   });
 
-const toExportFileName = (name: string) => `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "tier-list"}.png`;
+const toExportFileName = (name: string, extension: ImageExportFormat) =>
+  `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "tier-list"}.${extension}`;
 
 const loadState = (): PersistedState | undefined => loadPersistedState();
 
@@ -126,6 +129,8 @@ export const App = () => {
   const [activeThemeIndex, setActiveThemeIndex] = useState(saved?.activeThemeIndex ?? 0);
   const [effects, setEffects] = useState(saved?.effects ?? { glow: true, shake: false, confetti: false });
   const [isAddItemsOpen, setIsAddItemsOpen] = useState(false);
+  const [isExportCaptureMounted, setIsExportCaptureMounted] = useState(false);
+  const exportSurfaceRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     localStorage.setItem(
@@ -434,31 +439,53 @@ export const App = () => {
     }));
   };
 
-  const exportPresentation = async () => {
-    setMode("presentation");
-    setScreen("board");
-    await waitForPaint();
+  const exportImage = async (format: ImageExportFormat) => {
+    setIsExportCaptureMounted(true);
 
-    const surface = document.querySelector<HTMLElement>(".presentation-export-surface");
-    if (!surface) {
-      return;
+    try {
+      await waitForPaint();
+
+      const surface = exportSurfaceRef.current;
+      if (!surface) {
+        throw new Error("Presentation export surface is not available.");
+      }
+
+      const imageOptions = {
+        backgroundColor: activeTheme.background,
+        cacheBust: true,
+        pixelRatio: 2
+      };
+      const dataUrl = format === "png"
+        ? await toPng(surface, imageOptions)
+        : await toJpeg(surface, { ...imageOptions, quality: 0.92 });
+
+      return window.tierStudio.exports.renderImage({
+        listId: board.id ?? board.name,
+        fileName: toExportFileName(board.name, format),
+        format,
+        scale: 2,
+        transparentBackground: false,
+        imageDataUrl: dataUrl
+      });
+    } finally {
+      setIsExportCaptureMounted(false);
+    }
+  };
+
+  const exportCsv = async () => {
+    if (!board.id) {
+      throw new Error("Save the board before CSV export.");
     }
 
-    const dataUrl = await toPng(surface, {
-      backgroundColor: activeTheme.background,
-      cacheBust: true,
-      pixelRatio: 2
-    });
-    const artifact = await window.tierStudio.exports.renderImage({
-      listId: board.name,
-      fileName: toExportFileName(board.name),
-      format: "png",
-      scale: 2,
-      transparentBackground: false,
-      imageDataUrl: dataUrl
-    });
+    return window.tierStudio.exports.exportCsv(board.id);
+  };
 
-    window.dispatchEvent(new CustomEvent("tier-studio:export-complete", { detail: artifact }));
+  const exportPackage = async () => {
+    if (!board.id) {
+      throw new Error("Save the board before package export.");
+    }
+
+    return window.tierStudio.exports.exportPackage(board.id);
   };
 
   const openBoard = async (listId: string) => {
@@ -500,6 +527,10 @@ export const App = () => {
   }
 
   const poolItems = board.items.filter((item) => item.container === "pool");
+  const noopDragStart = () => undefined;
+  const noopDropItem = () => undefined;
+  const noopMoveItem = () => undefined;
+  const noopSelectItem = () => undefined;
 
   return (
     <main
@@ -522,7 +553,9 @@ export const App = () => {
         poolItems={poolItems}
         onSetScreen={setScreen}
         onSetMode={setMode}
-        onExportPresentation={exportPresentation}
+        onExportImage={exportImage}
+        onExportCsv={exportCsv}
+        onExportPackage={exportPackage}
         onOpenAddItems={() => setIsAddItemsOpen(true)}
         onCloseAddItems={() => setIsAddItemsOpen(false)}
         onItemsAdded={refreshActiveBoard}
@@ -548,6 +581,22 @@ export const App = () => {
         onReorderRows={reorderRows}
         onRemoveRow={removeRow}
       />
+      {mode === "build" && isExportCaptureMounted ? (
+        <div className="export-capture-host" aria-hidden="true">
+          <PresentationSurface
+            ref={exportSurfaceRef}
+            board={board}
+            poolItems={poolItems}
+            selectedItemId={null}
+            selectedItem={null}
+            onDragStart={noopDragStart}
+            onDropItem={noopDropItem}
+            onMoveItem={noopMoveItem}
+            onSelectItem={noopSelectItem}
+            includeTestIds={false}
+          />
+        </div>
+      ) : null}
     </main>
   );
 };

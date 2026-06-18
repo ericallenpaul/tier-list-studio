@@ -1,4 +1,4 @@
-import type { DragEvent } from "react";
+import { forwardRef, type DragEvent } from "react";
 
 import type { EditorBoardState, EditorBoardItem, EditorContainer } from "../domain/editorTypes";
 import { ItemDock } from "./ItemDock";
@@ -13,9 +13,10 @@ type PresentationSurfaceProps = {
   onDropItem: (event: DragEvent<HTMLElement>, target: EditorContainer) => void;
   onMoveItem: (itemId: string, target: EditorContainer) => Promise<void> | void;
   onSelectItem: (itemId: string) => void;
+  includeTestIds?: boolean;
 };
 
-export const PresentationSurface = ({
+export const PresentationSurface = forwardRef<HTMLElement, PresentationSurfaceProps>(({
   board,
   poolItems,
   selectedItemId,
@@ -23,9 +24,10 @@ export const PresentationSurface = ({
   onDragStart,
   onDropItem,
   onMoveItem,
-  onSelectItem
-}: PresentationSurfaceProps) => (
-  <section className="workspace presentation-export-surface" data-testid="presentation-surface">
+  onSelectItem,
+  includeTestIds = true
+}, ref) => (
+  <section ref={ref} className="workspace presentation-export-surface" data-testid={includeTestIds ? "presentation-surface" : undefined}>
     <TierBoard
       board={board}
       selectedItemId={selectedItemId}
@@ -34,6 +36,7 @@ export const PresentationSurface = ({
       onDropItem={onDropItem}
       onMoveItem={onMoveItem}
       onSelectItem={onSelectItem}
+      testId={includeTestIds ? "tier-board" : null}
     />
     <ItemDock
       items={poolItems}
@@ -43,6 +46,9 @@ export const PresentationSurface = ({
       onDragStart={onDragStart}
       onDropItem={onDropItem}
       onSelectItem={onSelectItem}
+      testId={includeTestIds ? "item-dock" : null}
     />
   </section>
-);
+));
+
+PresentationSurface.displayName = "PresentationSurface";

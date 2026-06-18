@@ -33,6 +33,7 @@ type TierBoardProps = {
   onUpdateRow?: (rowId: string, patch: { label: string; color: string }) => Promise<void> | void;
   onReorderRows?: (rowIdsInOrder: string[]) => Promise<void> | void;
   onRemoveRow?: (rowId: string) => Promise<void> | void;
+  testId?: string | null;
 };
 
 type TierRowProps = {
@@ -175,7 +176,8 @@ export const TierBoard = ({
   onInsertRow,
   onUpdateRow,
   onReorderRows,
-  onRemoveRow
+  onRemoveRow,
+  testId = "tier-board"
 }: TierBoardProps) => {
   const [editingRow, setEditingRow] = useState<EditorTier | null>(null);
   const sensors = useSensors(
@@ -216,7 +218,7 @@ export const TierBoard = ({
   };
 
   return (
-    <section className="board-stage" data-testid="tier-board">
+    <section className="board-stage" data-testid={testId ?? undefined}>
       <div className="board">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={rowIds} strategy={verticalListSortingStrategy}>

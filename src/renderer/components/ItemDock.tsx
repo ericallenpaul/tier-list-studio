@@ -16,6 +16,7 @@ type ItemDockProps = {
   onSendSelectedToPool?: () => Promise<void> | void;
   onDuplicateSelected?: () => Promise<void> | void;
   onDeleteSelected?: () => Promise<void> | void;
+  testId?: string | null;
 };
 
 type SortMode = "label" | "date" | "kind";
@@ -45,7 +46,8 @@ export const ItemDock = ({
   onToggleItemSelection,
   onSendSelectedToPool,
   onDuplicateSelected,
-  onDeleteSelected
+  onDeleteSelected,
+  testId = "item-dock"
 }: ItemDockProps) => {
   const [filter, setFilter] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("label");
@@ -100,7 +102,7 @@ export const ItemDock = ({
   return (
     <section
       className="panel pool-strip"
-      data-testid="item-dock"
+      data-testid={testId ?? undefined}
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => onDropItem(event, "pool")}
     >

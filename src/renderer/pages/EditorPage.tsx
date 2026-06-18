@@ -2,11 +2,12 @@ import type { DragEvent } from "react";
 
 import { AddItemsModal } from "../components/AddItemsModal";
 import { BottomRail } from "../components/BottomRail";
+import { ExportPanel, type ImageExportFormat } from "../components/ExportPanel";
 import { ItemDock } from "../components/ItemDock";
 import { ItemInspector } from "../components/ItemInspector";
 import { PresentationSurface } from "../components/PresentationSurface";
 import { TierBoard } from "../components/TierBoard";
-import type { TierTemplate, UserSettings } from "../../shared/models/entities";
+import type { ExportArtifact, TierTemplate, UserSettings } from "../../shared/models/entities";
 import { SettingsPage } from "./SettingsPage";
 import type { EditorBoardItem, EditorBoardState, EditorContainer, EditorMode, EditorScreen } from "../domain/editorTypes";
 
@@ -38,7 +39,9 @@ type EditorPageProps = {
   poolItems: EditorBoardItem[];
   onSetScreen: (screen: EditorScreen) => void;
   onSetMode: (mode: EditorMode) => void;
-  onExportPresentation: () => void;
+  onExportImage: (format: ImageExportFormat) => Promise<ExportArtifact>;
+  onExportCsv: () => Promise<ExportArtifact>;
+  onExportPackage: () => Promise<ExportArtifact>;
   onOpenAddItems: () => void;
   onCloseAddItems: () => void;
   onItemsAdded: () => Promise<void>;
@@ -81,7 +84,9 @@ export const EditorPage = ({
   poolItems,
   onSetScreen,
   onSetMode,
-  onExportPresentation,
+  onExportImage,
+  onExportCsv,
+  onExportPackage,
   onOpenAddItems,
   onCloseAddItems,
   onItemsAdded,
@@ -152,9 +157,12 @@ export const EditorPage = ({
           <button className="icon-button" aria-label="Redo">
             ↷
           </button>
-          <button className="primary" onClick={onExportPresentation}>
-            Export
-          </button>
+          <ExportPanel
+            canExportSavedArtifacts={Boolean(board.id)}
+            onExportImage={onExportImage}
+            onExportCsv={onExportCsv}
+            onExportPackage={onExportPackage}
+          />
           {screen === "board" ? (
             <>
               <button className="primary" onClick={onOpenAddItems} disabled={!board.id}>

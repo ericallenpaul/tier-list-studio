@@ -38,6 +38,8 @@ import { voidPayloadSchema } from "../../shared/schemas/common.js";
 import { openDatabase, type SqliteDatabase } from "../services/db/connection.js";
 import { runMigrations } from "../services/db/migrations.js";
 import { createDefaultAiProviderRegistry } from "../services/ai/providerRegistry.js";
+import { exportCsvArtifact } from "../services/export/exportCsvService.js";
+import { exportPackageArtifact } from "../services/export/exportPackageService.js";
 import { createCoreListServices, type CoreListServices } from "../services/lists/listService.js";
 import type { RenderImageInput } from "../../shared/models/api.js";
 import type { TierList, TierTemplate } from "../../shared/models/entities.js";
@@ -107,7 +109,7 @@ const imageDataUrlToBuffer = (dataUrl: string) => {
 
 const renderImageArtifact = async (app: Pick<App, "getPath">, input: RenderImageInput) => {
   if (!input.imageDataUrl) {
-    throw new Error("Renderer image data is required for PNG export.");
+    throw new Error("Renderer image data is required for image export.");
   }
 
   const filePath = input.filePath ?? join(app.getPath("documents"), "Tier List Studio", "Exports", safeExportFileName(input));
@@ -289,8 +291,33 @@ export const registerHandlers = (
   registerValidatedHandler(ipcMain, tierStudioChannels.snapshots.restore, snapshotIdPayloadSchema, notImplemented(tierStudioChannels.snapshots.restore));
 
   registerValidatedHandler(ipcMain, tierStudioChannels.exports.renderImage, renderImageInputSchema, (input) => renderImageArtifact(app, input));
-  registerValidatedHandler(ipcMain, tierStudioChannels.exports.exportPackage, listIdPayloadSchema, notImplemented(tierStudioChannels.exports.exportPackage));
-  registerValidatedHandler(ipcMain, tierStudioChannels.exports.exportCsv, listIdPayloadSchema, notImplemented(tierStudioChannels.exports.exportCsv));
+  registerValidatedHandler(ipcMain, tierStudioChannels.exports.exportPackage, listIdPayloadSchema, async ({ listId }) => {
+    if (options.services?.exports?.exportPackage) {
+      return options.services.exports.exportPackage(listId);
+    }
+
+    const list = await coreServices().lists.get(listId);
+    if (!list) {
+      throw new Error(`Tier list not found: ${listId}`);
+    }
+
+    return exportPackageArtifact(list, {
+      appVersion: app.getVersion(),
+      documentsPath: app.getPath("documents")
+    });
+  });
+  registerValidatedHandler(ipcMain, tierStudioChannels.exports.exportCsv, listIdPayloadSchema, async ({ listId }) => {
+    if (options.services?.exports?.exportCsv) {
+      return options.services.exports.exportCsv(listId);
+    }
+
+    const list = await coreServices().lists.get(listId);
+    if (!list) {
+      throw new Error(`Tier list not found: ${listId}`);
+    }
+
+    return exportCsvArtifact(list, { documentsPath: app.getPath("documents") });
+  });
 
   registerValidatedHandler(ipcMain, tierStudioChannels.backups.create, voidPayloadSchema, notImplemented(tierStudioChannels.backups.create));
   registerValidatedHandler(ipcMain, tierStudioChannels.backups.restore, filePathPayloadSchema, notImplemented(tierStudioChannels.backups.restore));
