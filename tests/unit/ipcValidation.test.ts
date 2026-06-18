@@ -161,6 +161,15 @@ describe("representative IPC input schemas", () => {
     });
   });
 
+  it("rejects renderer-controlled export image file paths", () => {
+    expect(() =>
+      renderImageInputSchema.parse({
+        listId: "list-1",
+        filePath: "C:\\tmp\\outside.png"
+      })
+    ).toThrow();
+  });
+
   it("parses AI item generation payloads with defaults", () => {
     expect(
       aiGenerateItemsInputSchema.parse({

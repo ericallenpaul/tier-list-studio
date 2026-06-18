@@ -1,5 +1,6 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { readFile as fsReadFile, stat as fsStat } from "node:fs/promises";
+import type { Stats } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -11,6 +12,8 @@ import { closeDatabase, openDatabase, type SqliteDatabase } from "../../src/main
 import { runMigrations } from "../../src/main/services/db/migrations.js";
 import { createCoreListServices } from "../../src/main/services/lists/listService.js";
 import { AssetRepository } from "../../src/main/services/repositories/index.js";
+import type { MediaAssetRecord } from "../../src/main/services/repositories/types.js";
+import type { TierListDetail } from "../../src/shared/models/api.js";
 
 let tempDir: string;
 let db: SqliteDatabase;
@@ -232,6 +235,67 @@ describe("export services", () => {
     }));
     expect(packageData.assets[0].file.contentBase64).toBeUndefined();
   });
+
+  it("reads embeddable package assets sequentially", async () => {
+    const { assetRecords, list } = createPackageAssetFixture();
+    let activeReads = 0;
+    let maxActiveReads = 0;
+
+    const artifact = await exportPackageArtifact(list, {
+      appVersion: "0.1.0-test",
+      assetRecords,
+      documentsPath: tempDir,
+      fileSystem: {
+        readFile: (async (filePath) => {
+          activeReads += 1;
+          maxActiveReads = Math.max(maxActiveReads, activeReads);
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          activeReads -= 1;
+          return Buffer.from(String(filePath).includes("one") ? "one" : "two");
+        }) as typeof fsReadFile,
+        stat: (async () => ({ size: 3 } as Stats)) as typeof fsStat
+      },
+      maxTotalEmbeddedAssetBytes: 10,
+      userDataPath: tempDir
+    });
+
+    const packageData = JSON.parse(readFileSync(artifact.filePath, "utf8")) as {
+      assets: Array<{ file: { kind: string; contentBase64?: string } }>;
+    };
+
+    expect(maxActiveReads).toBe(1);
+    expect(packageData.assets.map((asset) => asset.file.kind)).toEqual(["embedded", "embedded"]);
+  });
+
+  it("uses local references after the package total embed limit is reached", async () => {
+    const { assetRecords, list } = createPackageAssetFixture();
+
+    const artifact = await exportPackageArtifact(list, {
+      appVersion: "0.1.0-test",
+      assetRecords,
+      documentsPath: tempDir,
+      fileSystem: {
+        readFile: (async (filePath) => Buffer.from(String(filePath).includes("one") ? "one" : "two")) as typeof fsReadFile,
+        stat: (async () => ({ size: 3 } as Stats)) as typeof fsStat
+      },
+      maxTotalEmbeddedAssetBytes: 3,
+      userDataPath: tempDir
+    });
+
+    const packageData = JSON.parse(readFileSync(artifact.filePath, "utf8")) as {
+      assets: Array<{ file: { kind: string; reason?: string; contentBase64?: string } }>;
+    };
+
+    expect(packageData.assets[0].file).toEqual(expect.objectContaining({
+      kind: "embedded",
+      contentBase64: Buffer.from("one").toString("base64")
+    }));
+    expect(packageData.assets[1].file).toEqual(expect.objectContaining({
+      kind: "local-reference",
+      reason: "Managed asset file would exceed the package total embed limit."
+    }));
+    expect(packageData.assets[1].file.contentBase64).toBeUndefined();
+  });
 });
 
 const createPopulatedList = async () => {
@@ -275,3 +339,76 @@ const createMediaList = async () => {
     list
   };
 };
+
+const createPackageAssetFixture = () => {
+  const now = new Date().toISOString();
+  const list: TierListDetail = {
+    id: "list-package-assets",
+    workspaceId: "workspace-1",
+    name: "Package Assets",
+    isArchived: false,
+    style: {},
+    createdAt: now,
+    updatedAt: now,
+    items: [
+      {
+        id: "item-one",
+        listId: "list-package-assets",
+        kind: "image",
+        label: "One",
+        assetId: "asset-one",
+        metadata: {},
+        style: {},
+        createdAt: now,
+        updatedAt: now
+      },
+      {
+        id: "item-two",
+        listId: "list-package-assets",
+        kind: "image",
+        label: "Two",
+        assetId: "asset-two",
+        metadata: {},
+        style: {},
+        createdAt: now,
+        updatedAt: now
+      }
+    ]
+  };
+  const assetRecords: MediaAssetRecord[] = [
+    createPackageAssetRecord({
+      id: "asset-one",
+      originalName: "one.png",
+      sourcePath: join(tempDir, "source-one.png"),
+      managedRelPath: "assets/one.png",
+      createdAt: "2026-01-01T00:00:00.000Z"
+    }),
+    createPackageAssetRecord({
+      id: "asset-two",
+      originalName: "two.png",
+      sourcePath: join(tempDir, "source-two.png"),
+      managedRelPath: "assets/two.png",
+      createdAt: "2026-01-01T00:00:01.000Z"
+    })
+  ];
+
+  return { assetRecords, list };
+};
+
+const createPackageAssetRecord = (input: Pick<MediaAssetRecord, "id" | "originalName" | "sourcePath" | "managedRelPath" | "createdAt">): MediaAssetRecord => ({
+  id: input.id,
+  sha256: input.id,
+  originalName: input.originalName,
+  mimeType: "image/png",
+  extension: ".png",
+  byteSize: 3,
+  width: null,
+  height: null,
+  durationMs: null,
+  sourcePath: input.sourcePath,
+  managedRelPath: input.managedRelPath,
+  thumbRelPath: "",
+  posterRelPath: "",
+  metadata: {},
+  createdAt: input.createdAt
+});

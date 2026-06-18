@@ -79,7 +79,6 @@ export const positionMoveInputSchema = z.object({
 
 export const renderImageInputSchema = z.object({
   listId: idSchema,
-  filePath: filePathSchema.optional(),
   fileName: nonEmptyStringSchema.optional(),
   imageDataUrl: z.string().trim().startsWith("data:image/").optional(),
   format: z.enum(["png", "jpg", "webp"]).default("png"),

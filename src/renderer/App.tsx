@@ -210,7 +210,7 @@ export const App = () => {
   };
 
   const duplicateBoard = () => {
-    setBoard((current) => ({
+    setBoard(({ id: _id, ...current }) => ({
       ...current,
       name: `${current.name} Copy`,
       items: current.items.map((item, index) => ({ ...item, id: `${item.id}-copy-${index}` }))

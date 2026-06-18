@@ -116,7 +116,7 @@ const renderImageArtifact = async (app: Pick<App, "getPath">, input: RenderImage
     throw new Error("Renderer image data is required for image export.");
   }
 
-  const filePath = input.filePath ?? join(app.getPath("documents"), "Tier List Studio", "Exports", safeExportFileName(input));
+  const filePath = join(app.getPath("documents"), "Tier List Studio", "Exports", safeExportFileName(input));
   await mkdir(dirname(filePath), { recursive: true });
   await writeFile(filePath, imageDataUrlToBuffer(input.imageDataUrl));
 

@@ -13,6 +13,7 @@ type ExportPackageOptions = {
   filePath?: string;
   fileSystem?: PackageAssetFileSystem;
   maxEmbeddedAssetBytes?: number;
+  maxTotalEmbeddedAssetBytes?: number;
   userDataPath?: string;
 };
 
@@ -101,6 +102,7 @@ export type PackageAsset = Omit<MediaAssetRecord, "sourcePath"> & {
 };
 
 const defaultMaxEmbeddedAssetBytes = 50 * 1024 * 1024;
+const defaultMaxTotalEmbeddedAssetBytes = 200 * 1024 * 1024;
 
 type PackageAssetFileSystem = {
   readFile: typeof readFile;
@@ -118,7 +120,7 @@ const defaultFileSystem: PackageAssetFileSystem = {
 
 const collectPackageAssets = async (
   list: TierListDetail,
-  options: Pick<ExportPackageOptions, "assetRecords" | "fileSystem" | "maxEmbeddedAssetBytes" | "userDataPath">
+  options: Pick<ExportPackageOptions, "assetRecords" | "fileSystem" | "maxEmbeddedAssetBytes" | "maxTotalEmbeddedAssetBytes" | "userDataPath">
 ): Promise<PackageAsset[]> => {
   const referencedAssetIds = new Set((list.items ?? [])
     .map((item) => item.assetId)
@@ -131,19 +133,34 @@ const collectPackageAssets = async (
     .filter((asset) => referencedAssetIds.has(asset.id))
     .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id));
 
-  return Promise.all(assets.map(async (asset) => ({
-    ...asset,
-    file: await createAssetFileEntry(asset, {
+  const packageAssets: PackageAsset[] = [];
+  let totalEmbeddedAssetBytes = 0;
+  const maxTotalEmbeddedAssetBytes = options.maxTotalEmbeddedAssetBytes ?? defaultMaxTotalEmbeddedAssetBytes;
+
+  for (const asset of assets) {
+    const file = await createAssetFileEntry(asset, {
       fileSystem: options.fileSystem ?? defaultFileSystem,
       maxEmbeddedAssetBytes: options.maxEmbeddedAssetBytes ?? defaultMaxEmbeddedAssetBytes,
+      remainingEmbeddedAssetBytes: Math.max(0, maxTotalEmbeddedAssetBytes - totalEmbeddedAssetBytes),
       userDataPath: options.userDataPath
-    })
-  })));
+    });
+
+    if (file.kind === "embedded") {
+      totalEmbeddedAssetBytes += file.byteSize;
+    }
+
+    packageAssets.push({
+      ...asset,
+      file
+    });
+  }
+
+  return packageAssets;
 };
 
 const createAssetFileEntry = async (
   asset: MediaAssetRecord,
-  options: { fileSystem: PackageAssetFileSystem; maxEmbeddedAssetBytes: number; userDataPath?: string }
+  options: { fileSystem: PackageAssetFileSystem; maxEmbeddedAssetBytes: number; remainingEmbeddedAssetBytes: number; userDataPath?: string }
 ): Promise<PackageAssetFile> => {
   const sourcePathExists = await pathExists(asset.sourcePath, options.fileSystem);
   const managedPath = options.userDataPath ? resolveManagedAssetPath(options.userDataPath, asset.managedRelPath) : undefined;
@@ -191,6 +208,15 @@ const createAssetFileEntry = async (
       kind: "local-reference",
       byteSize: fileStat.size,
       reason: "Managed asset file is larger than the package embed limit."
+    };
+  }
+
+  if (fileStat.size > options.remainingEmbeddedAssetBytes) {
+    return {
+      ...baseEntry,
+      kind: "local-reference",
+      byteSize: fileStat.size,
+      reason: "Managed asset file would exceed the package total embed limit."
     };
   }
 
