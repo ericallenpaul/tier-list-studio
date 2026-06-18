@@ -1,32 +1,15 @@
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { toPng } from "html-to-image";
 
-type Screen = "board" | "settings";
-type Mode = "build" | "presentation";
-type Container = "pool" | string;
-
-type Tier = {
-  id: string;
-  label: string;
-  color: string;
-};
-
-type BoardItem = {
-  id: string;
-  label: string;
-  container: Container;
-};
-
-type BoardState = {
-  name: string;
-  tiers: Tier[];
-  items: BoardItem[];
-};
+import { mapTierListToBoard } from "./domain/editorMappers";
+import type { EditorBoardState, EditorContainer, EditorMode, EditorScreen, EditorTier } from "./domain/editorTypes";
+import { DashboardPage } from "./pages/DashboardPage";
+import { activeListSessionKey, activeListStorageKey, createEditorStore } from "./state/editorStore";
 
 type Template = {
   name: string;
   accent: string;
-  tiers: Tier[];
+  tiers: EditorTier[];
   items: string[];
 };
 
@@ -43,11 +26,11 @@ type ProviderState = {
 };
 
 type PersistedState = {
-  screen?: Screen;
-  mode?: Mode;
+  screen?: EditorScreen;
+  mode?: EditorMode;
   selectedItemId?: string | null;
   activeThemeIndex?: number;
-  board?: BoardState;
+  board?: EditorBoardState;
   providers?: ProviderState[];
   effects?: { glow: boolean; shake: boolean; confetti: boolean };
 };
@@ -90,7 +73,7 @@ const defaultProviders: ProviderState[] = [
   { name: "Local", configured: false, enabled: false }
 ];
 
-const makeBoard = (template: Template = initialTemplates[0]): BoardState => ({
+const makeBoard = (template: Template = initialTemplates[0]): EditorBoardState => ({
   name: template.name,
   tiers: template.tiers,
   items: template.items.map((label, index) => ({
@@ -130,11 +113,16 @@ const loadState = (): PersistedState | undefined => {
   }
 };
 
+const editorStore = createEditorStore(window.tierStudio);
+
 export const App = () => {
   const saved = loadState();
-  const [screen, setScreen] = useState<Screen>(saved?.screen ?? "board");
-  const [mode, setMode] = useState<Mode>(saved?.mode ?? "build");
-  const [board, setBoard] = useState<BoardState>(saved?.board ?? makeBoard());
+  const savedListId = window.localStorage.getItem(activeListStorageKey);
+  const startsInEditor = Boolean(savedListId && window.sessionStorage.getItem(activeListSessionKey));
+  const [isEditorOpen, setIsEditorOpen] = useState(startsInEditor);
+  const [screen, setScreen] = useState<EditorScreen>(saved?.screen ?? "board");
+  const [mode, setMode] = useState<EditorMode>(saved?.mode ?? "build");
+  const [board, setBoard] = useState<EditorBoardState>(saved?.board ?? makeBoard());
   const [templates, setTemplates] = useState<Template[]>(initialTemplates);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(saved?.selectedItemId ?? null);
   const [activeThemeIndex, setActiveThemeIndex] = useState(saved?.activeThemeIndex ?? 0);
@@ -158,6 +146,30 @@ export const App = () => {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  useEffect(() => {
+    if (!startsInEditor || !savedListId) {
+      return;
+    }
+
+    let isMounted = true;
+    editorStore.openBoard(savedListId)
+      .then(() => window.tierStudio.lists.get(savedListId))
+      .then((list) => {
+        if (isMounted && list) {
+          setBoard(mapTierListToBoard(list));
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setIsEditorOpen(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [savedListId, startsInEditor]);
 
   const activeTheme = themes[activeThemeIndex];
   const selectedItem = useMemo(
@@ -196,7 +208,7 @@ export const App = () => {
     }));
   };
 
-  const moveItem = (itemId: string, target: Container) => {
+  const moveItem = (itemId: string, target: EditorContainer) => {
     setBoard((current) => ({
       ...current,
       items: current.items.map((item) => (item.id === itemId ? { ...item, container: target } : item))
@@ -209,7 +221,7 @@ export const App = () => {
     event.dataTransfer.setData("text/plain", itemId);
   };
 
-  const onDropItem = (event: DragEvent<HTMLElement>, target: Container) => {
+  const onDropItem = (event: DragEvent<HTMLElement>, target: EditorContainer) => {
     event.preventDefault();
     const itemId = event.dataTransfer.getData("text/plain");
     if (itemId) {
@@ -272,6 +284,24 @@ export const App = () => {
 
     window.dispatchEvent(new CustomEvent("tier-studio:export-complete", { detail: artifact }));
   };
+
+  const openBoard = async (listId: string) => {
+    await editorStore.openBoard(listId);
+    const list = await window.tierStudio.lists.get(listId);
+    if (!list) {
+      return;
+    }
+
+    setBoard(mapTierListToBoard(list));
+    setSelectedItemId(null);
+    setScreen("board");
+    setMode("build");
+    setIsEditorOpen(true);
+  };
+
+  if (!isEditorOpen) {
+    return <DashboardPage store={editorStore} onOpenBoard={openBoard} />;
+  }
 
   const poolItems = board.items.filter((item) => item.container === "pool");
   const visibleScreen = mode === "presentation" ? "board" : screen;
