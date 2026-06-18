@@ -115,11 +115,19 @@ const loadState = (): PersistedState | undefined => {
 
 const editorStore = createEditorStore(window.tierStudio);
 
-const loadBoard = async (listId: string) => {
+const loadBoard = async (listId: string, savedBoard?: EditorBoardState) => {
   await editorStore.openBoard(listId);
   const list = await window.tierStudio.lists.get(listId);
   if (!list) {
     throw new Error(`Tier list not found: ${listId}`);
+  }
+
+  if (savedBoard?.id === list.id) {
+    return {
+      ...savedBoard,
+      id: list.id,
+      name: list.name
+    };
   }
 
   return mapTierListToBoard(list);
@@ -163,7 +171,7 @@ export const App = () => {
     }
 
     let isMounted = true;
-    loadBoard(savedListId)
+    loadBoard(savedListId, saved?.board)
       .then((loadedBoard) => {
         if (isMounted) {
           setBoard(loadedBoard);

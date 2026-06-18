@@ -44,4 +44,44 @@ test.describe("dashboard editor flow", () => {
     await page.reload();
     await expect(page.getByRole("heading", { name: "Snack Ranking" })).toBeVisible();
   });
+
+  test("preserves local editor items for the active DB board after reload", async () => {
+    const itemName = "Reload Proof Pickle";
+
+    await page.evaluate(() => window.sessionStorage.removeItem("tier-list-studio-editor-session"));
+    await page.reload();
+    await page.getByRole("button", { name: "New Board" }).click();
+    await page.getByLabel("Board title").fill("Reload Survival");
+    await page.getByRole("button", { name: "Create" }).click();
+    await expect(page.getByRole("heading", { name: "Reload Survival" })).toBeVisible();
+
+    await page.evaluate((name) => {
+      window.prompt = () => name;
+    }, itemName);
+    await page.getByRole("button", { name: "New item" }).click();
+    await expect(page.getByRole("button", { name: itemName })).toBeVisible();
+
+    await page.getByRole("button", { name: itemName }).click();
+    await page.locator(".tier-row").first().click();
+    await expect(page.locator(".tier-row").first().getByRole("button", { name: itemName })).toBeVisible();
+
+    await page.waitForFunction(
+      ({ expectedName }) => {
+        const raw = window.localStorage.getItem("tier-list-studio-state");
+        if (!raw) {
+          return false;
+        }
+
+        const state = JSON.parse(raw) as {
+          board?: { items?: Array<{ label: string; container: string }> };
+        };
+        return state.board?.items?.some((item) => item.label === expectedName && item.container === "s") ?? false;
+      },
+      { expectedName: itemName }
+    );
+
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Reload Survival" })).toBeVisible();
+    await expect(page.locator(".tier-row").first().getByRole("button", { name: itemName })).toBeVisible();
+  });
 });
