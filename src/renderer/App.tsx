@@ -10,13 +10,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { EditorPage } from "./pages/EditorPage";
 import { activeListSessionKey, activeListStorageKey, createEditorStore } from "./state/editorStore";
 import { loadPersistedState, type PersistedState } from "./state/persistedState";
-
-type Template = {
-  name: string;
-  accent: string;
-  tiers: EditorTier[];
-  items: string[];
-};
+import { starterTemplates, type StarterTemplateSeed } from "./templates/starterTemplates";
 
 type Theme = {
   name: string;
@@ -24,53 +18,36 @@ type Theme = {
   background: string;
 };
 
-const initialTemplates: Template[] = [
-  {
-    name: "Launch Week",
-    accent: "#22c55e",
-    tiers: [
-      { id: "s", label: "S", color: "#ef4444" },
-      { id: "a", label: "A", color: "#f97316" },
-      { id: "b", label: "B", color: "#eab308" },
-      { id: "c", label: "C", color: "#22c55e" },
-      { id: "d", label: "D", color: "#3b82f6" }
-    ],
-    items: ["Ramen", "Coffee", "Camera", "Headphones", "Notebook", "Desk Lamp", "Microphone", "Mouse"]
-  },
-  {
-    name: "Creator Picks",
-    accent: "#f97316",
-    tiers: [
-      { id: "featured", label: "Featured", color: "#38bdf8" },
-      { id: "good", label: "Good", color: "#22c55e" },
-      { id: "mixed", label: "Mixed", color: "#eab308" },
-      { id: "pass", label: "Pass", color: "#ef4444" }
-    ],
-    items: ["Intro", "B-roll", "Talking Head", "FX", "Music", "Cutaway", "Graphic", "Outro"]
-  }
-];
-
 const themes: Theme[] = [
   { name: "Midnight", accent: "#22c55e", background: "#0f1218" },
   { name: "Signal", accent: "#38bdf8", background: "#0b1020" },
   { name: "Heat", accent: "#f97316", background: "#150f0b" }
 ];
 
-const makeBoard = (template: Template = initialTemplates[0]): EditorBoardState => {
+const fallbackTemplate = starterTemplates.find((template) => template.id === "template-launch-week") ?? starterTemplates[0];
+
+const makeBoard = (template: StarterTemplateSeed = fallbackTemplate): EditorBoardState => {
   const now = new Date().toISOString();
+  const rows = template.definition.rows.map<EditorTier>((row, index) => ({
+    id: row.label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `row-${index + 1}`,
+    label: row.label,
+    color: row.fillColor
+  }));
+
   return {
     name: template.name,
-    tiers: template.tiers,
-    items: template.items.map((label, index) => ({
+    tiers: rows,
+    items: (template.definition.items ?? []).map((item, index) => ({
       id: `${template.name.toLowerCase().replace(/\s+/g, "-")}-${index + 1}`,
-      label,
+      label: item.label,
       kind: "text",
-      container: "pool",
+      container: item.container === "tier" && item.rowIndex !== null ? rows[item.rowIndex]?.id ?? "pool" : "pool",
       metadata: {},
       style: {},
       createdAt: now,
       updatedAt: now
-    }))
+    })),
+    style: template.definition.style
   };
 };
 
@@ -523,7 +500,7 @@ export const App = () => {
   };
 
   if (!isEditorOpen) {
-    return <DashboardPage store={editorStore} onOpenBoard={openBoard} />;
+    return <DashboardPage store={editorStore} templates={templates} onOpenBoard={openBoard} onUseTemplate={useTemplate} />;
   }
 
   const poolItems = board.items.filter((item) => item.container === "pool");

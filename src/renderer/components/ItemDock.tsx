@@ -101,7 +101,7 @@ export const ItemDock = ({
 
   return (
     <section
-      className="panel pool-strip"
+      className={`panel pool-strip ${items.length === 0 ? "empty" : ""}`}
       data-testid={testId ?? undefined}
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => onDropItem(event, "pool")}

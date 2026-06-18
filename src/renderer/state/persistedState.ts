@@ -53,7 +53,8 @@ export const normalizeEditorBoard = (board: unknown, fallbackDate = new Date().t
     ...(typeof board.id === "string" && board.id.trim() ? { id: board.id } : {}),
     name: typeof board.name === "string" && board.name.trim() ? board.name : "Untitled Board",
     tiers: Array.isArray(board.tiers) ? board.tiers.map((tier, index) => normalizeTier(tier, index)) : [],
-    items: Array.isArray(board.items) ? board.items.map((item, index) => normalizeItem(item, index, fallbackDate)) : []
+    items: Array.isArray(board.items) ? board.items.map((item, index) => normalizeItem(item, index, fallbackDate)) : [],
+    style: isRecord(board.style) ? board.style : {}
   };
 };
 

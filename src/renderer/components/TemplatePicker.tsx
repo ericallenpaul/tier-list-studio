@@ -5,11 +5,19 @@ import type { TierTemplate } from "../../shared/models/entities";
 type TemplatePickerProps = {
   templates: TierTemplate[];
   canSaveTemplate: boolean;
+  showSaveTemplate?: boolean;
   onSaveTemplate: (name: string) => Promise<void>;
   onUseTemplate: (templateId: string) => Promise<void>;
 };
 
-export const TemplatePicker = ({ templates, canSaveTemplate, onSaveTemplate, onUseTemplate }: TemplatePickerProps) => {
+export const TemplatePicker = ({
+  templates,
+  canSaveTemplate,
+  showSaveTemplate = true,
+  onSaveTemplate,
+  onUseTemplate
+}: TemplatePickerProps) => {
+  const [isUseOpen, setIsUseOpen] = useState(false);
   const [isSaveOpen, setIsSaveOpen] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +49,7 @@ export const TemplatePicker = ({ templates, canSaveTemplate, onSaveTemplate, onU
     setUsingTemplateId(templateId);
     try {
       await onUseTemplate(templateId);
+      setIsUseOpen(false);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not use template.");
     } finally {
@@ -48,30 +57,57 @@ export const TemplatePicker = ({ templates, canSaveTemplate, onSaveTemplate, onU
     }
   };
 
+  const renderTemplateButton = (template: TierTemplate) => (
+    <button
+      key={template.id}
+      className="template-card"
+      style={{ ["--accent" as string]: template.rows[0]?.color ?? "#38bdf8" }}
+      disabled={Boolean(usingTemplateId)}
+      onClick={() => void useTemplate(template.id)}
+    >
+      <span className="template-name">{template.name}</span>
+      {usingTemplateId === template.id ? <span className="template-status">Using...</span> : null}
+      <span className="template-bar" />
+    </button>
+  );
+
   return (
     <section className="panel templates-panel">
       <div className="panel-head">
         <span className="panel-title">Templates</span>
-        <button className="primary" onClick={() => setIsSaveOpen(true)} disabled={!canSaveTemplate}>
-          Save as Template
-        </button>
-      </div>
-      <div className="template-list">
-        {templates.map((template) => (
-          <button
-            key={template.id}
-            className="template-card"
-            style={{ ["--accent" as string]: template.rows[0]?.color ?? "#38bdf8" }}
-            disabled={Boolean(usingTemplateId)}
-            onClick={() => void useTemplate(template.id)}
-          >
-            <span className="template-name">{template.name}</span>
-            {usingTemplateId === template.id ? <span className="template-status">Using...</span> : null}
-            <span className="template-bar" />
+        <div className="panel-actions">
+          <button className="primary" onClick={() => setIsUseOpen(true)} disabled={templates.length === 0}>
+            Use Template
           </button>
-        ))}
+          {showSaveTemplate ? (
+            <button className="primary" onClick={() => setIsSaveOpen(true)} disabled={!canSaveTemplate}>
+              Save as Template
+            </button>
+          ) : null}
+        </div>
       </div>
+      {!isUseOpen ? <div className="template-list">{templates.map(renderTemplateButton)}</div> : null}
       {error && !isSaveOpen ? <p className="modal-error">{error}</p> : null}
+
+      {isUseOpen ? (
+        <div className="modal-backdrop" role="presentation">
+          <section className="modal-panel" role="dialog" aria-modal="true" aria-label="Use template">
+            <div className="modal-head">
+              <div>
+                <div className="eyebrow">Template</div>
+                <h2>Use Template</h2>
+              </div>
+              <button className="icon-button" aria-label="Close" onClick={() => setIsUseOpen(false)}>
+                x
+              </button>
+            </div>
+            <div className="template-list modal-template-list">
+              {templates.map(renderTemplateButton)}
+            </div>
+            {error ? <p className="modal-error">{error}</p> : null}
+          </section>
+        </div>
+      ) : null}
 
       {isSaveOpen ? (
         <div className="modal-backdrop" role="presentation">

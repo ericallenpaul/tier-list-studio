@@ -1,13 +1,17 @@
 import { useEffect, useState, type FormEvent } from "react";
 
+import type { TierTemplate } from "../../shared/models/entities";
+import { TemplatePicker } from "../components/TemplatePicker";
 import type { DashboardState, EditorStore } from "../domain/editorTypes";
 
 type DashboardPageProps = {
   store: EditorStore;
+  templates: TierTemplate[];
   onOpenBoard: (listId: string) => Promise<void>;
+  onUseTemplate: (templateId: string) => Promise<void>;
 };
 
-export const DashboardPage = ({ store, onOpenBoard }: DashboardPageProps) => {
+export const DashboardPage = ({ store, templates, onOpenBoard, onUseTemplate }: DashboardPageProps) => {
   const [dashboard, setDashboard] = useState<DashboardState>({ workspaces: [], recentLists: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -102,6 +106,14 @@ export const DashboardPage = ({ store, onOpenBoard }: DashboardPageProps) => {
             </button>
           ))}
         </section>
+
+        <TemplatePicker
+          templates={templates}
+          canSaveTemplate={false}
+          showSaveTemplate={false}
+          onSaveTemplate={async () => undefined}
+          onUseTemplate={onUseTemplate}
+        />
       </section>
     </main>
   );

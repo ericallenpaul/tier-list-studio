@@ -29,6 +29,7 @@ export type EditorBoardState = {
   name: string;
   tiers: EditorTier[];
   items: EditorBoardItem[];
+  style?: JsonRecord;
 };
 
 export type DashboardState = {

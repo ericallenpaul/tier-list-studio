@@ -50,7 +50,8 @@ export const mapTierListToBoard = (list: ListWithItems): EditorBoardState => {
     id: list.id,
     name: list.name,
     tiers,
-    items
+    items,
+    style: list.style
   };
 };
 

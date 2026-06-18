@@ -81,8 +81,11 @@ describe("SQLite connection and migrations", () => {
       db.prepare("SELECT id FROM templates WHERE built_in = 1 ORDER BY id").all()
     ).toEqual([
       { id: "template-classic-ranking" },
+      { id: "template-clean-studio" },
       { id: "template-launch-week" },
-      { id: "template-simple-priority" }
+      { id: "template-midnight-neon" },
+      { id: "template-simple-priority" },
+      { id: "template-tournament-board" }
     ]);
     expect(db.prepare("SELECT COUNT(*) AS count FROM app_settings WHERE key = 'defaultWorkspaceId'").get()).toEqual({ count: 1 });
   });
@@ -228,8 +231,11 @@ describe("repositories", () => {
 
     expect(builtIns.map((template) => template.id)).toEqual(expect.arrayContaining([
       "template-classic-ranking",
+      "template-clean-studio",
       "template-launch-week",
-      "template-simple-priority"
+      "template-midnight-neon",
+      "template-simple-priority",
+      "template-tournament-board"
     ]));
     expect(templates.get(custom.id)?.builtIn).toBe(false);
   });
