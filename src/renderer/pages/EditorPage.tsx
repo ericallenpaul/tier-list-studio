@@ -3,6 +3,7 @@ import type { DragEvent } from "react";
 import { AddItemsModal } from "../components/AddItemsModal";
 import { BottomRail } from "../components/BottomRail";
 import { ItemDock } from "../components/ItemDock";
+import { ItemInspector } from "../components/ItemInspector";
 import { PresentationSurface } from "../components/PresentationSurface";
 import { TierBoard } from "../components/TierBoard";
 import type { EditorBoardItem, EditorBoardState, EditorContainer, EditorMode, EditorScreen, EditorTier } from "../domain/editorTypes";
@@ -43,6 +44,7 @@ type EditorPageProps = {
   providers: ProviderState[];
   effects: Effects;
   selectedItemId: string | null;
+  selectedItemIds: string[];
   selectedItem: EditorBoardItem | null;
   poolItems: EditorBoardItem[];
   onSetScreen: (screen: EditorScreen) => void;
@@ -59,10 +61,15 @@ type EditorPageProps = {
   onToggleEffect: (key: keyof Effects) => void;
   onToggleProvider: (name: string) => void;
   onSendSelectedToPool: () => void;
+  onSendCheckedToPool: () => Promise<void> | void;
+  onDuplicateCheckedItems: () => Promise<void> | void;
+  onDeleteCheckedItems: () => Promise<void> | void;
+  onToggleItemSelection: (itemId: string) => void;
   onDragStart: (event: DragEvent<HTMLElement>, itemId: string) => void;
   onDropItem: (event: DragEvent<HTMLElement>, target: EditorContainer) => void;
   onMoveItem: (itemId: string, target: EditorContainer) => Promise<void> | void;
   onSelectItem: (itemId: string) => void;
+  onUpdateItem: (itemId: string, patch: { label: string; metadata: Record<string, unknown> }) => Promise<void> | void;
   onInsertRow: (afterRowId?: string) => Promise<void> | void;
   onUpdateRow: (rowId: string, patch: { label: string; color: string }) => Promise<void> | void;
   onReorderRows: (rowIdsInOrder: string[]) => Promise<void> | void;
@@ -80,6 +87,7 @@ export const EditorPage = ({
   providers,
   effects,
   selectedItemId,
+  selectedItemIds,
   selectedItem,
   poolItems,
   onSetScreen,
@@ -96,10 +104,15 @@ export const EditorPage = ({
   onToggleEffect,
   onToggleProvider,
   onSendSelectedToPool,
+  onSendCheckedToPool,
+  onDuplicateCheckedItems,
+  onDeleteCheckedItems,
+  onToggleItemSelection,
   onDragStart,
   onDropItem,
   onMoveItem,
   onSelectItem,
+  onUpdateItem,
   onInsertRow,
   onUpdateRow,
   onReorderRows,
@@ -199,13 +212,22 @@ export const EditorPage = ({
             onReorderRows={onReorderRows}
             onRemoveRow={onRemoveRow}
           />
-          <ItemDock
-            items={poolItems}
-            selectedItemId={selectedItemId}
-            onDragStart={onDragStart}
-            onDropItem={onDropItem}
-            onSelectItem={onSelectItem}
-          />
+          <aside className="right-rail">
+            <ItemDock
+              items={board.items}
+              selectedItemId={selectedItemId}
+              selectedItemIds={selectedItemIds}
+              getContainerLabel={(container) => container === "pool" ? "Pool" : board.tiers.find((tier) => tier.id === container)?.label ?? "Placed"}
+              onDragStart={onDragStart}
+              onDropItem={onDropItem}
+              onSelectItem={onSelectItem}
+              onToggleItemSelection={onToggleItemSelection}
+              onSendSelectedToPool={onSendCheckedToPool}
+              onDuplicateSelected={onDuplicateCheckedItems}
+              onDeleteSelected={onDeleteCheckedItems}
+            />
+            <ItemInspector item={selectedItem} onSave={onUpdateItem} />
+          </aside>
           <BottomRail
             templates={templates}
             themes={themes}

@@ -48,5 +48,14 @@ export const createEditorStore = (api: TierStudioApi): EditorStore => ({
   },
   removeRow: async (rowId: string) => {
     await api.rows.remove(rowId);
+  },
+  updateItem: async (itemId, patch) => {
+    await api.items.update(itemId, patch);
+  },
+  removeItem: async (itemId: string) => {
+    await api.items.remove(itemId);
+  },
+  duplicateTextItems: async (listId: string, labels: string[]) => {
+    await api.items.addTextBatch(listId, labels);
   }
 });

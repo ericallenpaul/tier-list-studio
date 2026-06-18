@@ -1,4 +1,5 @@
-import type { TierItem, TierList, TierPosition, TierRow, Workspace } from "../../shared/models/entities";
+import type { JsonRecord, TierItem, TierItemKind, TierList, TierPosition, TierRow, Workspace } from "../../shared/models/entities";
+import type { ItemUpdateInput } from "../../shared/models/api";
 
 export type { TierList, Workspace };
 
@@ -15,7 +16,12 @@ export type EditorTier = {
 export type EditorBoardItem = {
   id: string;
   label: string;
+  kind: TierItemKind;
   container: EditorContainer;
+  metadata: JsonRecord;
+  style: JsonRecord;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type EditorBoardState = {
@@ -39,6 +45,9 @@ export type EditorStore = {
   updateRow: (rowId: string, patch: { label?: string; color?: string }) => Promise<void>;
   reorderRows: (listId: string, rowIdsInOrder: string[]) => Promise<void>;
   removeRow: (rowId: string) => Promise<void>;
+  updateItem: (itemId: string, patch: ItemUpdateInput) => Promise<void>;
+  removeItem: (itemId: string) => Promise<void>;
+  duplicateTextItems: (listId: string, labels: string[]) => Promise<void>;
 };
 
 export type ListWithItems = TierList & {

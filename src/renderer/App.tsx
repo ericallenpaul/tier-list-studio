@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { toPng } from "html-to-image";
 
 import { mapTierListToBoard } from "./domain/editorMappers";
-import type { EditorBoardState, EditorContainer, EditorMode, EditorScreen, EditorTier } from "./domain/editorTypes";
+import type { EditorBoardItem, EditorBoardState, EditorContainer, EditorMode, EditorScreen, EditorTier } from "./domain/editorTypes";
 import { DashboardPage } from "./pages/DashboardPage";
 import { EditorPage } from "./pages/EditorPage";
 import { activeListSessionKey, activeListStorageKey, createEditorStore } from "./state/editorStore";
@@ -30,6 +30,7 @@ type PersistedState = {
   screen?: EditorScreen;
   mode?: EditorMode;
   selectedItemId?: string | null;
+  selectedItemIds?: string[];
   activeThemeIndex?: number;
   board?: EditorBoardState;
   providers?: ProviderState[];
@@ -74,15 +75,23 @@ const defaultProviders: ProviderState[] = [
   { name: "Local", configured: false, enabled: false }
 ];
 
-const makeBoard = (template: Template = initialTemplates[0]): EditorBoardState => ({
-  name: template.name,
-  tiers: template.tiers,
-  items: template.items.map((label, index) => ({
-    id: `${template.name.toLowerCase().replace(/\s+/g, "-")}-${index + 1}`,
-    label,
-    container: "pool"
-  }))
-});
+const makeBoard = (template: Template = initialTemplates[0]): EditorBoardState => {
+  const now = new Date().toISOString();
+  return {
+    name: template.name,
+    tiers: template.tiers,
+    items: template.items.map((label, index) => ({
+      id: `${template.name.toLowerCase().replace(/\s+/g, "-")}-${index + 1}`,
+      label,
+      kind: "text",
+      container: "pool",
+      metadata: {},
+      style: {},
+      createdAt: now,
+      updatedAt: now
+    }))
+  };
+};
 
 const waitForPaint = () =>
   new Promise<void>((resolve) => {
@@ -126,6 +135,7 @@ export const App = () => {
   const [board, setBoard] = useState<EditorBoardState>(saved?.board ?? makeBoard());
   const [templates, setTemplates] = useState<Template[]>(initialTemplates);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(saved?.selectedItemId ?? null);
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>(saved?.selectedItemIds ?? []);
   const [activeThemeIndex, setActiveThemeIndex] = useState(saved?.activeThemeIndex ?? 0);
   const [providers, setProviders] = useState<ProviderState[]>(saved?.providers ?? defaultProviders);
   const [effects, setEffects] = useState(saved?.effects ?? { glow: true, shake: false, confetti: false });
@@ -134,9 +144,9 @@ export const App = () => {
   useEffect(() => {
     localStorage.setItem(
       "tier-list-studio-state",
-      JSON.stringify({ screen, mode, board, selectedItemId, activeThemeIndex, providers, effects })
+      JSON.stringify({ screen, mode, board, selectedItemId, selectedItemIds, activeThemeIndex, providers, effects })
     );
-  }, [screen, mode, board, selectedItemId, activeThemeIndex, providers, effects]);
+  }, [screen, mode, board, selectedItemId, selectedItemIds, activeThemeIndex, providers, effects]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -178,9 +188,18 @@ export const App = () => {
     [board.items, selectedItemId]
   );
 
+  useEffect(() => {
+    const itemIds = new Set(board.items.map((item) => item.id));
+    if (selectedItemId && !itemIds.has(selectedItemId)) {
+      setSelectedItemId(null);
+    }
+    setSelectedItemIds((current) => current.filter((itemId) => itemIds.has(itemId)));
+  }, [board.items, selectedItemId]);
+
   const resetBoard = (template: Template = templates[0]) => {
     setBoard(makeBoard(template));
     setSelectedItemId(null);
+    setSelectedItemIds([]);
     setScreen("board");
   };
 
@@ -207,6 +226,7 @@ export const App = () => {
       name: `${current.name} Copy`,
       items: current.items.map((item, index) => ({ ...item, id: `${item.id}-copy-${index}` }))
     }));
+    setSelectedItemIds([]);
   };
 
   const moveItem = async (itemId: string, target: EditorContainer) => {
@@ -244,6 +264,7 @@ export const App = () => {
 
     setBoard(await loadBoard(board.id));
     setSelectedItemId(null);
+    setSelectedItemIds([]);
   };
 
   const toggleProvider = (name: string) => {
@@ -261,6 +282,109 @@ export const App = () => {
       return;
     }
     void moveItem(selectedItemId, "pool");
+  };
+
+  const toggleItemSelection = (itemId: string) => {
+    setSelectedItemIds((current) =>
+      current.includes(itemId) ? current.filter((selectedId) => selectedId !== itemId) : [...current, itemId]
+    );
+  };
+
+  const checkedItems = () =>
+    selectedItemIds
+      .map((itemId) => board.items.find((item) => item.id === itemId))
+      .filter((item): item is EditorBoardItem => Boolean(item));
+
+  const sendCheckedToPool = async () => {
+    const itemIds = checkedItems().map((item) => item.id);
+    if (itemIds.length === 0) {
+      return;
+    }
+
+    if (board.id) {
+      const targetIndex = board.items.filter((item) => item.container === "pool" && !itemIds.includes(item.id)).length;
+      await editorStore.moveItems(board.id, itemIds, null, targetIndex);
+      await refreshActiveBoard();
+      return;
+    }
+
+    setBoard((current) => ({
+      ...current,
+      items: current.items.map((item) => (itemIds.includes(item.id) ? { ...item, container: "pool" } : item))
+    }));
+    setSelectedItemIds([]);
+    setSelectedItemId(null);
+  };
+
+  const duplicateCheckedItems = async () => {
+    const items = checkedItems();
+    if (items.length === 0) {
+      return;
+    }
+    const copyLabels = items.map((item) => `${item.label} Copy`);
+
+    if (board.id) {
+      await editorStore.duplicateTextItems(board.id, copyLabels);
+      await refreshActiveBoard();
+      return;
+    }
+
+    const now = new Date().toISOString();
+    setBoard((current) => ({
+      ...current,
+      items: [
+        ...current.items,
+        ...items.map((item, index) => ({
+          ...item,
+          id: `${item.id}-copy-${Date.now()}-${index}`,
+          label: `${item.label} Copy`,
+          kind: "text" as const,
+          container: "pool" as const,
+          createdAt: now,
+          updatedAt: now
+        }))
+      ]
+    }));
+    setSelectedItemIds([]);
+  };
+
+  const deleteCheckedItems = async () => {
+    const itemIds = checkedItems().map((item) => item.id);
+    if (itemIds.length === 0) {
+      return;
+    }
+
+    if (board.id) {
+      await Promise.all(itemIds.map((itemId) => editorStore.removeItem(itemId)));
+      await refreshActiveBoard();
+      return;
+    }
+
+    setBoard((current) => ({
+      ...current,
+      items: current.items.filter((item) => !itemIds.includes(item.id))
+    }));
+    setSelectedItemIds([]);
+    setSelectedItemId((current) => current && itemIds.includes(current) ? null : current);
+  };
+
+  const updateItem = async (itemId: string, patch: { label: string; metadata: Record<string, unknown> }) => {
+    if (board.id) {
+      await editorStore.updateItem(itemId, patch);
+      setBoard(await loadBoard(board.id));
+      setSelectedItemId(null);
+      return;
+    }
+
+    setBoard((current) => ({
+      ...current,
+      items: current.items.map((item) =>
+        item.id === itemId
+          ? { ...item, label: patch.label, metadata: patch.metadata, updatedAt: new Date().toISOString() }
+          : item
+      )
+    }));
+    setSelectedItemId(null);
   };
 
   const insertRow = async (afterRowId?: string) => {
@@ -361,6 +485,7 @@ export const App = () => {
     const loadedBoard = await loadBoard(listId);
     setBoard(loadedBoard);
     setSelectedItemId(null);
+    setSelectedItemIds([]);
     setScreen("board");
     setMode("build");
     setIsEditorOpen(true);
@@ -388,6 +513,7 @@ export const App = () => {
         providers={providers}
         effects={effects}
         selectedItemId={selectedItemId}
+        selectedItemIds={selectedItemIds}
         selectedItem={selectedItem}
         poolItems={poolItems}
         onSetScreen={setScreen}
@@ -404,10 +530,15 @@ export const App = () => {
         onToggleEffect={toggleEffect}
         onToggleProvider={toggleProvider}
         onSendSelectedToPool={sendSelectedToPool}
+        onSendCheckedToPool={sendCheckedToPool}
+        onDuplicateCheckedItems={duplicateCheckedItems}
+        onDeleteCheckedItems={deleteCheckedItems}
+        onToggleItemSelection={toggleItemSelection}
         onDragStart={onDragStart}
         onDropItem={onDropItem}
         onMoveItem={moveItem}
         onSelectItem={setSelectedItemId}
+        onUpdateItem={updateItem}
         onInsertRow={insertRow}
         onUpdateRow={updateRow}
         onReorderRows={reorderRows}

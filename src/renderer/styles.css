@@ -235,8 +235,10 @@ button {
 
 .sidebar,
 .editor-page,
+.right-rail,
 .workspace,
 .inspector,
+.item-inspector,
 .metadata-strip,
 .bottom-rail,
 .settings-page {
@@ -288,9 +290,12 @@ button {
   grid-row: 3;
 }
 
-.editor-page > .pool-strip {
+.editor-page > .right-rail {
   grid-column: 2;
   grid-row: 2 / 4;
+  display: grid;
+  grid-template-rows: minmax(220px, 1fr) auto;
+  gap: 12px;
   margin-bottom: 0;
 }
 
@@ -366,6 +371,10 @@ button {
 
 .panel {
   margin-bottom: 14px;
+}
+
+.right-rail .panel {
+  margin-bottom: 0;
 }
 
 .panel-head {
@@ -614,10 +623,120 @@ button {
   margin: 0;
 }
 
+.dock-tools,
+.inspector-form {
+  display: grid;
+  gap: 10px;
+}
+
+.dock-tools input,
+.dock-sort select,
+.inspector-form input,
+.inspector-form textarea {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.68);
+  color: #f8fafc;
+  padding: 9px 10px;
+  font: inherit;
+}
+
+.dock-sort {
+  display: grid;
+  gap: 6px;
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.dock-filter {
+  display: grid;
+  gap: 6px;
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.dock-bulk-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.dock-bulk-actions .pill-button {
+  min-width: 0;
+  padding: 8px 6px;
+  font-size: 0.76rem;
+}
+
+.dock-bulk-actions .pill-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.dock-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  max-height: 42vh;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.dock-item {
+  display: grid;
+  grid-template-columns: auto 76px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dock-item.compact {
+  display: contents;
+}
+
+.dock-item-meta {
+  min-width: 0;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .pool-grid {
   grid-template-columns: repeat(auto-fill, 76px);
   align-content: start;
   justify-content: start;
+}
+
+.item-inspector {
+  align-self: end;
+}
+
+.inspector-form textarea {
+  resize: vertical;
+  min-height: 112px;
+}
+
+.inspector-facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 10px;
+  color: #94a3b8;
+  font-size: 0.78rem;
+}
+
+.inspector-facts strong {
+  color: #e2e8f0;
+  font-weight: 700;
+  min-width: 0;
+}
+
+.empty-inspector {
+  color: #94a3b8;
+  font-size: 0.85rem;
 }
 
 .presentation .pool-grid {
@@ -791,10 +910,14 @@ button {
   }
 
   .editor-page > .board-stage,
-  .editor-page > .pool-strip,
+  .editor-page > .right-rail,
   .metadata-strip {
     grid-column: 1;
     grid-row: auto;
+  }
+
+  .editor-page > .right-rail {
+    grid-template-rows: auto;
   }
 
   .bottom-rail {

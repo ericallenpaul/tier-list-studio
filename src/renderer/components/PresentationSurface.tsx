@@ -39,6 +39,7 @@ export const PresentationSurface = ({
       items={poolItems}
       selectedItemId={selectedItemId}
       showHeader={false}
+      showControls={false}
       onDragStart={onDragStart}
       onDropItem={onDropItem}
       onSelectItem={onSelectItem}
