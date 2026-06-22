@@ -147,7 +147,12 @@ export const EditorPage = ({
           <button className="active" onClick={() => onSetMode("build")}>
             Build
           </button>
-          <button onClick={() => onSetMode("presentation")}>Presentation</button>
+          <button title="Press Esc to return to Build mode." onClick={() => onSetMode("presentation")}>
+            Presentation
+          </button>
+          <span className="mode-hint">
+            <kbd>Esc</kbd> exits
+          </span>
         </div>
 
         <div className="topbar-right">
